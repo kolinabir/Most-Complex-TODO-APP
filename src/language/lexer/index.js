@@ -128,6 +128,8 @@ export class TodoLangLexer {
       case '=':
         if (this.match('=')) {
           this.addToken(TokenType.EQUAL, '==', startLine, startColumn, start);
+        } else if (this.match('>')) {
+          this.addToken(TokenType.ARROW, '=>', startLine, startColumn, start);
         } else {
           this.addToken(TokenType.ASSIGN, '=', startLine, startColumn, start);
         }

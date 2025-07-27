@@ -73,25 +73,236 @@ class TodoLangTestRunner {
   }
 
   async runParserTests() {
-    console.log('🌳 Running Parser Tests...');
+    try {
+      const { runComprehensiveParserTests } = await import('./tests/language/parser-comprehensive.test.js');
+      const results = runComprehensiveParserTests();
+
+      this.results.passed += results.passed;
+      this.results.failed += results.failed;
+      this.results.total += results.total;
+    } catch (error) {
+      console.log('❌ Failed to run comprehensive parser tests:', error.message);
+      this.results.failed++;
+      this.results.total++;
+    }
+
+    console.log('🌳 Running Basic Parser Tests...');
 
     const testSuite = new TestSuite('Parser');
 
-    // Placeholder tests - will be implemented in task 3
-    testSuite.addTest('should parse component declarations', () => {
-      console.log('  ⏭️  Parser not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Parser implementation pending' };
-    });
+    try {
+      const { TodoLangLexer } = await import('./src/language/lexer/index.js');
+      const { TodoLangParser, ComponentNode, StateNode, JSXElementNode } = await import('./src/language/parser/index.js');
 
-    testSuite.addTest('should parse state declarations', () => {
-      console.log('  ⏭️  Parser not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Parser implementation pending' };
-    });
+      // Helper function to parse source code
+      function parseSource(source) {
+        const lexer = new TodoLangLexer();
+        const parser = new TodoLangParser();
+        const tokens = lexer.tokenize(source);
+        return parser.parse(tokens);
+      }
 
-    testSuite.addTest('should parse JSX elements', () => {
-      console.log('  ⏭️  Parser not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Parser implementation pending' };
-    });
+      testSuite.addTest('should parse minimal component', () => {
+        try {
+          const source = `
+            component TestComponent {
+              render() {
+                <div>Hello</div>
+              }
+            }
+          `;
+          const ast = parseSource(source);
+
+          if (ast.declarations.length !== 1) {
+            return { status: 'failed', message: 'Expected 1 declaration' };
+          }
+
+          const component = ast.declarations[0];
+          if (!(component instanceof ComponentNode)) {
+            return { status: 'failed', message: 'Expected ComponentNode' };
+          }
+
+          if (component.name !== 'TestComponent') {
+            return { status: 'failed', message: 'Expected component name to be TestComponent' };
+          }
+
+          return { status: 'passed', message: 'Component parsed successfully' };
+        } catch (error) {
+          return { status: 'failed', message: `Parse error: ${error.message}` };
+        }
+      });
+
+      testSuite.addTest('should parse component with state', () => {
+        try {
+          const source = `
+            component TodoApp {
+              state {
+                todos: Todo[] = []
+                filter: string = "all"
+              }
+
+              render() {
+                <div>App</div>
+              }
+            }
+          `;
+          const ast = parseSource(source);
+
+          const component = ast.declarations[0];
+          if (!component.stateDeclaration) {
+            return { status: 'failed', message: 'Expected state declaration' };
+          }
+
+          if (!(component.stateDeclaration instanceof StateNode)) {
+            return { status: 'failed', message: 'Expected StateNode' };
+          }
+
+          if (component.stateDeclaration.properties.length !== 2) {
+            return { status: 'failed', message: 'Expected 2 state properties' };
+          }
+
+          return { status: 'passed', message: 'Component with state parsed successfully' };
+        } catch (error) {
+          return { status: 'failed', message: `Parse error: ${error.message}` };
+        }
+      });
+
+      testSuite.addTest('should parse JSX elements', () => {
+        try {
+          const source = `
+            component TestComponent {
+              render() {
+                <div class="container">
+                  <h1>Title</h1>
+                  <p>Content</p>
+                </div>
+              }
+            }
+          `;
+          const ast = parseSource(source);
+
+          const component = ast.declarations[0];
+          if (!component.renderMethod) {
+            return { status: 'failed', message: 'Expected render method' };
+          }
+
+          if (component.renderMethod.body.length === 0) {
+            return { status: 'failed', message: 'Expected render body' };
+          }
+
+          const jsxElement = component.renderMethod.body[0].expression;
+          if (!(jsxElement instanceof JSXElementNode)) {
+            return { status: 'failed', message: 'Expected JSXElementNode' };
+          }
+
+          if (jsxElement.tagName !== 'div') {
+            return { status: 'failed', message: 'Expected div tag' };
+          }
+
+          if (jsxElement.children.length !== 2) {
+            return { status: 'failed', message: 'Expected 2 children' };
+          }
+
+          return { status: 'passed', message: 'JSX elements parsed successfully' };
+        } catch (error) {
+          return { status: 'failed', message: `Parse error: ${error.message}` };
+        }
+      });
+
+      testSuite.addTest('should parse model declarations', () => {
+        try {
+          const source = `
+            model Todo {
+              id: string
+              text: string
+              completed: boolean = false
+            }
+          `;
+          const ast = parseSource(source);
+
+          if (ast.declarations.length !== 1) {
+            return { status: 'failed', message: 'Expected 1 declaration' };
+          }
+
+          const model = ast.declarations[0];
+          if (model.type !== 'Model') {
+            return { status: 'failed', message: 'Expected ModelNode' };
+          }
+
+          if (model.name !== 'Todo') {
+            return { status: 'failed', message: 'Expected model name to be Todo' };
+          }
+
+          if (model.properties.length !== 3) {
+            return { status: 'failed', message: 'Expected 3 properties' };
+          }
+
+          return { status: 'passed', message: 'Model declaration parsed successfully' };
+        } catch (error) {
+          return { status: 'failed', message: `Parse error: ${error.message}` };
+        }
+      });
+
+      testSuite.addTest('should parse service declarations', () => {
+        try {
+          const source = `
+            service StorageService {
+              save(key: string, data: any): void {
+                localStorage.setItem(key, JSON.stringify(data))
+              }
+
+              load(key: string): any? {
+                return localStorage.getItem(key)
+              }
+            }
+          `;
+          const ast = parseSource(source);
+
+          if (ast.declarations.length !== 1) {
+            return { status: 'failed', message: 'Expected 1 declaration' };
+          }
+
+          const service = ast.declarations[0];
+          if (service.type !== 'Service') {
+            return { status: 'failed', message: 'Expected ServiceNode' };
+          }
+
+          if (service.name !== 'StorageService') {
+            return { status: 'failed', message: 'Expected service name to be StorageService' };
+          }
+
+          if (service.methods.length !== 2) {
+            return { status: 'failed', message: 'Expected 2 methods' };
+          }
+
+          return { status: 'passed', message: 'Service declaration parsed successfully' };
+        } catch (error) {
+          return { status: 'failed', message: `Parse error: ${error.message}` };
+        }
+      });
+
+      testSuite.addTest('should handle syntax errors gracefully', () => {
+        try {
+          const source = `
+            component {
+              render() { <div>Test</div> }
+            }
+          `;
+          parseSource(source);
+          return { status: 'failed', message: 'Expected syntax error for missing component name' };
+        } catch (error) {
+          if (error.name === 'ParseError') {
+            return { status: 'passed', message: 'Syntax error handled correctly' };
+          }
+          return { status: 'failed', message: `Unexpected error: ${error.message}` };
+        }
+      });
+
+    } catch (importError) {
+      testSuite.addTest('parser import error', () => {
+        return { status: 'failed', message: `Failed to import parser: ${importError.message}` };
+      });
+    }
 
     await this.runTestSuite(testSuite);
   }

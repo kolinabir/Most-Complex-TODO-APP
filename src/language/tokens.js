@@ -31,6 +31,13 @@ export const TokenType = {
   THIS: 'THIS',
   TRUE: 'TRUE',
   FALSE: 'FALSE',
+  LET: 'LET',
+  CONST: 'CONST',
+  VAR: 'VAR',
+  BREAK: 'BREAK',
+  CONTINUE: 'CONTINUE',
+  IN: 'IN',
+  NEW: 'NEW',
 
   // Operators
   ASSIGN: 'ASSIGN',                    // =
@@ -61,6 +68,7 @@ export const TokenType = {
 
   QUESTION: 'QUESTION',                // ?
   DOT: 'DOT',                          // .
+  ARROW: 'ARROW',                      // =>
 
   // Delimiters
   LEFT_BRACE: 'LEFT_BRACE',            // {
@@ -107,7 +115,14 @@ export const Keywords = {
   'this': TokenType.THIS,
   'true': TokenType.TRUE,
   'false': TokenType.FALSE,
-  'null': TokenType.NULL
+  'null': TokenType.NULL,
+  'let': TokenType.LET,
+  'const': TokenType.CONST,
+  'var': TokenType.VAR,
+  'break': TokenType.BREAK,
+  'continue': TokenType.CONTINUE,
+  'in': TokenType.IN,
+  'new': TokenType.NEW
 };
 
 // Token class definition
