@@ -1,0 +1,34 @@
+{
+  "name": "enterprise-todo-app",
+  "version": "1.0.0",
+  "description": "An extremely over-engineered todo application built with a custom programming language",
+  "type": "module",
+  "main": "dist/index.html",
+  "scripts": {
+    "build": "node build.js",
+    "build:dev": "node build.js --dev",
+    "build:prod": "node build.js --production --minify --source-maps",
+    "dev": "node build.js --dev --watch",
+    "serve": "node dev-server.js",
+    "test": "node test-runner.js",
+    "test:language": "node test-runner.js --type lexer,parser,compiler",
+    "test:app": "node test-runner.js --type integration,e2e",
+    "compile": "node compiler/todolang-compiler.js",
+    "clean": "rm -rf dist/*"
+  },
+  "keywords": [
+    "todo",
+    "custom-language",
+    "over-engineering",
+    "dsl",
+    "compiler",
+    "framework"
+  ],
+  "author": "TodoLang Development Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}
