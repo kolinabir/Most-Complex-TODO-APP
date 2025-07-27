@@ -58,28 +58,18 @@ class TodoLangTestRunner {
   }
 
   async runLexerTests() {
-    console.log('📝 Running Lexer Tests...');
+    try {
+      const { runComprehensiveLexerTests } = await import('./tests/language/lexer-comprehensive.test.js');
+      const results = runComprehensiveLexerTests();
 
-    const testSuite = new TestSuite('Lexer');
-
-    // Placeholder tests - will be implemented in task 2
-    testSuite.addTest('should tokenize keywords', () => {
-      // Test will be implemented when lexer is built
-      console.log('  ⏭️  Lexer not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Lexer implementation pending' };
-    });
-
-    testSuite.addTest('should tokenize identifiers', () => {
-      console.log('  ⏭️  Lexer not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Lexer implementation pending' };
-    });
-
-    testSuite.addTest('should tokenize operators', () => {
-      console.log('  ⏭️  Lexer not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Lexer implementation pending' };
-    });
-
-    await this.runTestSuite(testSuite);
+      this.results.passed += results.passed;
+      this.results.failed += results.failed;
+      this.results.total += results.total;
+    } catch (error) {
+      console.log('❌ Failed to run lexer tests:', error.message);
+      this.results.failed++;
+      this.results.total++;
+    }
   }
 
   async runParserTests() {
