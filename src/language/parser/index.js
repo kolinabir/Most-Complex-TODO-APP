@@ -621,6 +621,8 @@ ull;
           this.error("Component can only have one render method");
         }
         renderMethod = this.parseRenderDeclaration();
+      } else if (this.match(TokenType.STATIC)) {
+        methods.push(this.parseMethodDeclaration());
       } else if (this.check(TokenType.IDENTIFIER)) {
         methods.push(this.parseMethodDeclaration());
       } else {
@@ -812,15 +814,15 @@ ull;
     const location = this.getLocation();
     const name = this.consume(TokenType.IDENTIFIER, "Expected type name").value;
 
-    let isOptional = false;
-    if (this.match(TokenType.QUESTION)) {
-      isOptional = true;
-    }
-
     let isArray = false;
     if (this.match(TokenType.LEFT_BRACKET)) {
       this.consume(TokenType.RIGHT_BRACKET, "Expected ']' after '['");
       isArray = true;
+    }
+
+    let isOptional = false;
+    if (this.match(TokenType.QUESTION)) {
+      isOptional = true;
     }
 
     return new TypeNode(name, isOptional, isArray, location);
@@ -926,6 +928,17 @@ ull;
         init = this.parseExpression();
       }
     }
+
+    // Check if this is a for-in loop
+    if (this.match(TokenType.IN)) {
+      const iterable = this.parseExpression();
+      this.consume(TokenType.RIGHT_PAREN, "Expected ')' after for-in clauses");
+      const body = this.parseStatement();
+
+      // For for-in loops, we use the init as the variable and iterable as the condition
+      return new ForNode(init, iterable, null, body, location);
+    }
+
     this.consume(TokenType.SEMICOLON, "Expected ';' after for loop initializer");
 
     let condition = null;
@@ -1133,7 +1146,13 @@ ull;
         this.consume(TokenType.RIGHT_BRACKET, "Expected ']' after array index");
         expression = new MemberNode(expression, index, true, location);
       } else if (this.match(TokenType.DOT)) {
-        const property = this.consume(TokenType.IDENTIFIER, "Expected property name after '.'");
+        // Allow both identifiers and keywords as property names
+        let property;
+        if (this.check(TokenType.IDENTIFIER) || this.peek().isKeyword()) {
+          property = this.advance();
+        } else {
+          throw new ParseError("Expected property name after '.'", this.peek());
+        }
         expression = new MemberNode(expression, new IdentifierNode(property.value, this.getLocation()), false, location);
       } else if (this.match(TokenType.LEFT_PAREN)) {
         const args = [];
@@ -1175,8 +1194,65 @@ ull;
       return new ThisNode(location);
     }
 
+    if (this.match(TokenType.NEW)) {
+      const callee = this.parsePrimaryExpression();
+      let args = [];
+      if (this.match(TokenType.LEFT_PAREN)) {
+        if (!this.check(TokenType.RIGHT_PAREN)) {
+          do {
+            args.push(this.parseExpression());
+          } while (this.match(TokenType.COMMA));
+        }
+        this.consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments");
+      }
+      return new NewExpressionNode(callee, args, location);
+    }
+
     if (this.match(TokenType.IDENTIFIER)) {
-      return new IdentifierNode(this.previous().value, location);
+      const identifier = this.previous();
+
+      // Check if this is a custom object literal syntax: TypeName { ... }
+      if (this.check(TokenType.LEFT_BRACE)) {
+        this.advance(); // consume '{'
+        const properties = [];
+
+        if (!this.check(TokenType.RIGHT_BRACE)) {
+          do {
+            const key = this.consume(TokenType.IDENTIFIER, "Expected property name").value;
+            this.consume(TokenType.COLON, "Expected ':' after property name");
+            const value = this.parseExpression();
+            properties.push(new ObjectPropertyNode(key, value, this.getLocation()));
+          } while (this.match(TokenType.COMMA));
+        }
+
+        this.consume(TokenType.RIGHT_BRACE, "Expected '}' after object properties");
+
+        // Create a special object literal with type information
+        const objectLiteral = new ObjectLiteralNode(properties, location);
+        objectLiteral.typeName = identifier.value; // Add type name for custom syntax
+        return objectLiteral;
+      }
+
+      // Check if this might be an arrow function parameter
+      if (this.match(TokenType.ARROW)) {
+        const param = new IdentifierNode(identifier.value, location);
+        let body;
+        if (this.check(TokenType.LEFT_BRACE)) {
+          // Block body - parse manually to avoid context issues
+          this.advance(); // consume '{'
+          const statements = [];
+          while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+            statements.push(this.parseStatement());
+          }
+          this.consume(TokenType.RIGHT_BRACE, "Expected '}' after arrow function block");
+          body = new BlockNode(statements, location);
+        } else {
+          // Expression body
+          body = this.parseExpression();
+        }
+        return new ArrowFunctionNode([param], body, false, location);
+      }
+      return new IdentifierNode(identifier.value, location);
     }
 
     if (this.match(TokenType.LEFT_PAREN)) {
@@ -1198,7 +1274,20 @@ ull;
 
         if (this.match(TokenType.ARROW)) {
           // This is an arrow function
-          const body = this.parseExpression();
+          let body;
+          if (this.check(TokenType.LEFT_BRACE)) {
+            // Block body - parse manually to avoid context issues
+            this.advance(); // consume '{'
+            const statements = [];
+            while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+              statements.push(this.parseStatement());
+            }
+            this.consume(TokenType.RIGHT_BRACE, "Expected '}' after arrow function block");
+            body = new BlockNode(statements, location);
+          } else {
+            // Expression body
+            body = this.parseExpression();
+          }
           return new ArrowFunctionNode(params, body, false, location);
         } else {
           throw new Error("Not an arrow function");

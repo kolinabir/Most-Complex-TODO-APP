@@ -453,7 +453,7 @@ export function runComprehensiveParserTests() {
       parseSource(`
         component TestComponent {
           state {
-            prop: invalid_syntax_here
+            prop invalid_syntax_here
           }
           render() { <div>Test</div> }
         }
@@ -602,7 +602,7 @@ export function runComprehensiveParserTests() {
                 placeholder="What needs to be done?"
                 value={this.inputValue}
                 onChange={e => this.inputValue = e.target.value}
-                onKeyPress={e => e.key === 'Enter' && this.addTodo(this.inputValue)}
+                onKeyPress={e => e.key == 'Enter' && this.addTodo(this.inputValue)}
               />
             </header>
 
@@ -630,7 +630,7 @@ export function runComprehensiveParserTests() {
                         class="edit"
                         value={todo.text}
                         onBlur={e => this.editTodo(todo.id, e.target.value)}
-                        onKeyPress={e => e.key === 'Enter' && this.editTodo(todo.id, e.target.value)}
+                        onKeyPress={e => e.key == 'Enter' && this.editTodo(todo.id, e.target.value)}
                       />
                     }
                   </li>
@@ -641,13 +641,13 @@ export function runComprehensiveParserTests() {
             <footer class="footer">
               <span class="todo-count">
                 <strong>{this.activeTodoCount}</strong>
-                {this.activeTodoCount === 1 ? " item" : " items"} left
+                {this.activeTodoCount == 1 ? " item" : " items"} left
               </span>
 
               <ul class="filters">
                 <li>
                   <a
-                    class={this.filter === "all" ? "selected" : ""}
+                    class={this.filter == "all" ? "selected" : ""}
                     onClick={() => this.setFilter("all")}
                   >
                     All
@@ -655,7 +655,7 @@ export function runComprehensiveParserTests() {
                 </li>
                 <li>
                   <a
-                    class={this.filter === "active" ? "selected" : ""}
+                    class={this.filter == "active" ? "selected" : ""}
                     onClick={() => this.setFilter("active")}
                   >
                     Active
@@ -663,7 +663,7 @@ export function runComprehensiveParserTests() {
                 </li>
                 <li>
                   <a
-                    class={this.filter === "completed" ? "selected" : ""}
+                    class={this.filter == "completed" ? "selected" : ""}
                     onClick={() => this.setFilter("completed")}
                   >
                     Completed
