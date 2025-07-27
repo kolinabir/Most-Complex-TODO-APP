@@ -323,27 +323,19 @@ class TodoLangTestRunner {
   }
 
   async runFrameworkTests() {
-    console.log('🏗️  Running Framework Tests...');
+    try {
+      const { runFrameworkTests } = await import('./tests/framework/index.js');
+      const results = runFrameworkTests();
 
-    const testSuite = new TestSuite('Framework');
-
-    // Placeholder tests - will be implemented in tasks 5-10
-    testSuite.addTest('should manage reactive state', () => {
-      console.log('  ⏭️  State manager not yet implemented - skipping test');
-      return { status: 'skipped', message: 'State manager implementation pending' };
-    });
-
-    testSuite.addTest('should render virtual DOM', () => {
-      console.log('  ⏭️  Virtual DOM not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Virtual DOM implementation pending' };
-    });
-
-    testSuite.addTest('should handle routing', () => {
-      console.log('  ⏭️  Router not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Router implementation pending' };
-    });
-
-    await this.runTestSuite(testSuite);
+      this.results.passed += results.passed;
+      this.results.failed += results.failed;
+      this.results.skipped += results.skipped || 0;
+      this.results.total += results.total;
+    } catch (error) {
+      console.log('❌ Failed to run framework tests:', error.message);
+      this.results.failed++;
+      this.results.total++;
+    }
   }
 
   async runIntegrationTests() {
