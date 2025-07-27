@@ -308,22 +308,18 @@ class TodoLangTestRunner {
   }
 
   async runCompilerTests() {
-    console.log('⚙️  Running Compiler Tests...');
+    try {
+      const { runCompilerTests } = await import('./tests/language/compiler.test.js');
+      const results = runCompilerTests();
 
-    const testSuite = new TestSuite('Compiler');
-
-    // Placeholder tests - will be implemented in task 4
-    testSuite.addTest('should compile components to JavaScript', () => {
-      console.log('  ⏭️  Compiler not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Compiler implementation pending' };
-    });
-
-    testSuite.addTest('should generate source maps', () => {
-      console.log('  ⏭️  Compiler not yet implemented - skipping test');
-      return { status: 'skipped', message: 'Compiler implementation pending' };
-    });
-
-    await this.runTestSuite(testSuite);
+      this.results.passed += results.passed;
+      this.results.failed += results.failed;
+      this.results.total += results.total;
+    } catch (error) {
+      console.log('❌ Failed to run compiler tests:', error.message);
+      this.results.failed++;
+      this.results.total++;
+    }
   }
 
   async runFrameworkTests() {

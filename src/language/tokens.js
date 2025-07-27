@@ -37,6 +37,7 @@ export const TokenType = {
   BREAK: 'BREAK',
   CONTINUE: 'CONTINUE',
   IN: 'IN',
+  OF: 'OF',
   NEW: 'NEW',
 
   // Operators
@@ -122,6 +123,7 @@ export const Keywords = {
   'break': TokenType.BREAK,
   'continue': TokenType.CONTINUE,
   'in': TokenType.IN,
+  'of': TokenType.OF,
   'new': TokenType.NEW
 };
 

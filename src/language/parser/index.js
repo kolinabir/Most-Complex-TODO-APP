@@ -561,7 +561,6 @@ export class TodoLangParser {
       }
 
       return new ProgramNode(declarations, this.getLocation());
-      return new ProgramNode(declarations, this.getLocation());
     } catch (error) {
       if (error instanceof ParseError) {
         throw error;
@@ -589,7 +588,7 @@ export class TodoLangParser {
       // If we reach here, we have an unexpected token
       this.error(`Unexpected token '${this.peek().value}'. Expected component, model, or service declaration.`);
       this.synchronize();
-ull;
+      return null;
     } catch (error) {
       this.error(error.message);
       this.synchronize();
@@ -929,13 +928,13 @@ ull;
       }
     }
 
-    // Check if this is a for-in loop
-    if (this.match(TokenType.IN)) {
+    // Check if this is a for-in or for-of loop
+    if (this.match(TokenType.IN) || this.match(TokenType.OF)) {
       const iterable = this.parseExpression();
-      this.consume(TokenType.RIGHT_PAREN, "Expected ')' after for-in clauses");
+      this.consume(TokenType.RIGHT_PAREN, "Expected ')' after for-in/for-of clauses");
       const body = this.parseStatement();
 
-      // For for-in loops, we use the init as the variable and iterable as the condition
+      // For for-in/for-of loops, we use the init as the variable and iterable as the condition
       return new ForNode(init, iterable, null, body, location);
     }
 
