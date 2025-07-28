@@ -1,8 +1,8 @@
+#!/usr/bin/env node
+
 /**
- * Framework Tests Index
- *
- * Runs all framework-related tests including state lleagement,
- * component system, virtual DOM, routing, and storage.
+ * Simple Router Test Runner
+ * Just for testing the router implementation
  */
 
 import { JSDOM } from 'jsdom';
@@ -27,7 +27,7 @@ global.performance = {
 };
 
 /**
- * Simple test framework for component tests
+ * Simple test framework for router tests
  */
 class SimpleTestFramework {
   constructor() {
@@ -114,11 +114,6 @@ class SimpleTestFramework {
           throw new Error(`Expected ${actual} to be defined`);
         }
       },
-      toBeInstanceOf: (expectedClass) => {
-        if (!(actual instanceof expectedClass)) {
-          throw new Error(`Expected ${actual} to be instance of ${expectedClass.name}`);
-        }
-      },
       toContain: (expected) => {
         if (Array.isArray(actual)) {
           if (!actual.includes(expected)) {
@@ -137,64 +132,23 @@ class SimpleTestFramework {
           throw new Error(`Expected length ${actual.length} to be ${expected}`);
         }
       },
-      toHaveProperty: (property, value) => {
-        if (!(property in actual)) {
-          throw new Error(`Expected object to have property ${property}`);
-        }
-        if (value !== undefined && actual[property] !== value) {
-          throw new Error(`Expected property ${property} to be ${value}, got ${actual[property]}`);
-        }
-      },
-      toHaveBeenCalled: () => {
-        if (!actual.mock || actual.mock.calls.length === 0) {
-          throw new Error('Expected function to have been called');
-        }
-      },
-      toHaveBeenCalledWith: (...args) => {
-        if (!actual.mock || actual.mock.calls.length === 0) {
-          throw new Error('Expected function to have been called');
-        }
-        const lastCall = actual.mock.calls[actual.mock.calls.length - 1];
-        if (JSON.stringify(lastCall) !== JSON.stringify(args)) {
-          throw new Error(`Expected function to have been called with ${JSON.stringify(args)}, got ${JSON.stringify(lastCall)}`);
-        }
-      },
       not: {
-        toBe: (expected) => {
-          if (actual === expected) {
-            throw new Error(`Expected ${actual} not to be ${expected}`);
-          }
-        },
-        toHaveBeenCalled: () => {
-          if (actual.mock && actual.mock.calls.length > 0) {
-            throw new Error('Expected function not to have been called');
-          }
-        }
-      },
-      toBeGreaterThan: (expected) => {
-        if (actual <= expected) {
-          throw new Error(`Expected ${actual} to be greater than ${expected}`);
-        }
-      },
-      toThrow: (expectedMessage) => {
-        if (typeof actual !== 'function') {
-          throw new Error('Expected a function to test for throwing');
-        }
-        try {
-          actual();
-          throw new Error('Expected function to throw an error');
-        } catch (error) {
-          if (expectedMessage && !error.message.includes(expectedMessage)) {
-            throw new Error(`Expected error message to contain "${expectedMessage}", got "${error.message}"`);
+        toContain: (expected) => {
+          if (Array.isArray(actual)) {
+            if (actual.includes(expected)) {
+              throw new Error(`Expected array not to contain ${expected}`);
+            }
+          } else if (typeof actual === 'string') {
+            if (actual.includes(expected)) {
+              throw new Error(`Expected string not to contain ${expected}`);
+            }
           }
         }
       },
-      stringContaining: (expected) => {
-        return {
-          asymmetricMatch: (actual) => {
-            return typeof actual === 'string' && actual.includes(expected);
-          }
-        };
+      toBeLessThan: (expected) => {
+        if (actual >= expected) {
+          throw new Error(`Expected ${actual} to be less than ${expected}`);
+        }
       }
     };
   }
@@ -222,23 +176,6 @@ class SimpleTestFramework {
     wrappedFn.mock = mockFn.mock;
     return wrappedFn;
   }
-
-  spyOn(object, method) {
-    const original = object[method];
-    const spy = this.fn(original);
-    object[method] = spy;
-
-    spy.mockImplementation = (impl) => {
-      spy.mock.implementation = impl;
-      return spy;
-    };
-
-    spy.mockRestore = () => {
-      object[method] = original;
-    };
-
-    return spy;
-  }
 }
 
 // Set up global test functions
@@ -247,42 +184,42 @@ global.describe = testFramework.describe.bind(testFramework);
 global.test = testFramework.test.bind(testFramework);
 global.beforeEach = testFramework.beforeEach.bind(testFramework);
 global.afterEach = testFramework.afterEach.bind(testFramework);
-
-// Enhanced expect function with static methods
-const expectFn = testFramework.expect.bind(testFramework);
-expectFn.stringContaining = (expected) => ({
-  asymmetricMatch: (actual) => typeof actual === 'string' && actual.includes(expected),
-  toString: () => `stringContaining("${expected}")`
-});
-
-global.expect = expectFn;
+global.expect = testFramework.expect.bind(testFramework);
 global.jest = {
-  fn: testFramework.fn.bind(testFramework),
-  spyOn: testFramework.spyOn.bind(testFramework)
+  fn: testFramework.fn.bind(testFramework)
 };
 
-/**
- * Run all framework tests
- */
-export async function runFrameworkTests() {
-  console.log('🏗️  Running Framework Tests...');
+// Run router tests
+async function runRouterTests() {
+  console.log('🧪 Running Router Tests...\n');
 
   try {
-    // Import and run component tests
-    await import('./components/component.test.js');
-
     // Import and run router tests
-    await import('./router.test.js');
+    await import('./tests/framework/router.test.js');
 
-    // TODO: Add other framework tests as they are implemented
-    // await import('./state/state.test.js');
-    // await import('./storage/storage.test.js');
+    console.log('\n' + '='.repeat(50));
+    console.log('📊 Router Test Results');
+    console.log('='.repeat(50));
+    console.log(`Total Tests: ${testFramework.results.total}`);
+    console.log(`✅ Passed: ${testFramework.results.passed}`);
+    console.log(`❌ Failed: ${testFramework.results.failed}`);
 
-    return testFramework.results;
+    if (testFramework.results.failed === 0) {
+      console.log('\n🎉 All router tests passed!');
+    } else {
+      console.log(`\n⚠️  ${testFramework.results.failed} test(s) failed`);
+    }
+
+    return testFramework.results.failed === 0;
   } catch (error) {
-    console.error('Error running framework tests:', error);
-    testFramework.results.failed++;
-    testFramework.results.total++;
-    return testFramework.results;
+    console.error('Error running router tests:', error);
+    return false;
   }
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runRouterTests().then(success => {
+    process.exit(success ? 0 : 1);
+  });
 }
