@@ -1,2 +1,359 @@
-// TodoLang data models will be implemented here
-// This will be implemented in task 11
+// TodoLang Data Models
+// Todo application data models with validation and factory methods
+
+// FilterType constants model for todo filtering
+model FilterType {
+  static ALL(): string {
+    return "all"
+  }
+
+  static ACTIVE(): string {
+    return "active"
+  }
+
+  static COMPLETED(): string {
+    return "completed"
+  }
+
+  static isValid(filter: string): boolean {
+    if (filter == "all") {
+      return true
+    }
+    if (filter == "active") {
+      return true
+    }
+    if (filter == "completed") {
+      return true
+    }
+    return false
+  }
+}
+
+// Todo model with validation and factory methods
+model Todo {
+  id: string
+  text: string
+  completed: boolean = false
+  createdAt: Date = Date.now()
+
+
+  static create(text: string): Todo {
+    if (text == null) {
+      throw new Error("Todo text must be a non-empty string")
+    }
+
+    const trimmedText = text.trim()
+    if (trimmedText.length == 0) {
+      throw new Error("Todo text cannot be empty or whitespace only")
+    }
+
+    if (trimmedText.length > 500) {
+      throw new Error("Todo text cannot exceed 500 characters")
+    }
+
+    return Todo {
+      id: this.generateId(),
+      text: trimmedText,
+      completed: false,
+      createdAt: Date.now()
+    }
+  }
+
+
+  static fromData(data: any): Todo {
+    if (data == null) {
+      throw new Error("Invalid todo data provided")
+    }
+
+    if (data.id == null) {
+      throw new Error("Todo must have a valid id")
+    }
+
+    if (data.text == null) {
+      throw new Error("Todo must have valid text")
+    }
+
+    return Todo {
+      id: data.id,
+      text: data.text,
+      completed: Boolean(data.completed),
+      createdAt: data.createdAt ? new Date(data.createdAt) : Date.now()
+    }
+  }
+
+  static generateId(): string {
+    const timestamp = Date.now()
+    const random = Math.random()
+    return "todo_" + timestamp + "_" + random
+  }
+
+  static validateText(text: string): boolean {
+    if (text == null) {
+      return false
+    }
+    const trimmed = text.trim()
+    if (trimmed.length == 0) {
+      return false
+    }
+    if (trimmed.length > 500) {
+      return false
+    }
+    return true
+  }
+
+  updateText(newText: string): void {
+    if (Todo.validateText(newText) == false) {
+      throw new Error("Invalid todo text provided")
+    }
+    this.text = newText.trim()
+  }
+
+  toggle(): void {
+    this.completed = this.completed == false
+  }
+
+  complete(): void {
+    this.completed = true
+  }
+
+  activate(): void {
+    this.completed = false
+  }
+
+  matchesFilter(filter: string): boolean {
+    if (filter == FilterType.ALL()) {
+      return true
+    }
+    if (filter == FilterType.ACTIVE()) {
+      return this.completed == false
+    }
+    if (filter == FilterType.COMPLETED()) {
+      return this.completed
+    }
+    return true
+  }
+  toData(): any {
+    return {
+      id: this.id,
+      text: this.text,
+      completed: this.completed,
+      createdAt: this.createdAt
+    }
+  }
+}
+
+// TodoList model for managing collections of todos
+model TodoList {
+  todos: Todo[] = []
+  filter: string = FilterType.ALL()
+
+  static create(): TodoList {
+    return TodoList {
+      todos: [],
+      filter: FilterType.ALL()
+    }
+  }
+
+  static fromData(data: any[]): TodoList {
+    if (Array.isArray(data) == false) {
+      throw new Error("TodoList data must be an array")
+    }
+
+    const todos = data.map(item => Todo.fromData(item))
+    return TodoList {
+      todos: todos,
+      filter: FilterType.ALL()
+    }
+  }
+
+  addTodo(text: string): Todo {
+    const todo = Todo.create(text)
+    this.todos.push(todo)
+    return todo
+  }
+
+  removeTodo(id: string): boolean {
+    const initialLength = this.todos.length
+    this.todos = this.todos.filter(todo => todo.id != id)
+    return this.todos.length < initialLength
+  }
+
+  findTodo(id: string): Todo? {
+    return this.todos.find(todo => todo.id == id) || null
+  }
+
+  updateTodo(id: string, newText: string): boolean {
+    const todo = this.findTodo(id)
+    if (todo) {
+      todo.updateText(newText)
+      return true
+    }
+    return false
+  }
+
+  toggleTodo(id: string): boolean {
+    const todo = this.findTodo(id)
+    if (todo) {
+      todo.toggle()
+      return true
+    }
+    return false
+  }
+
+  getFilteredTodos(): Todo[] {
+    return this.todos.filter(todo => todo.matchesFilter(this.filter))
+  }
+
+  setFilter(filter: string): Todo[] {
+    this.filter = filter
+    return this.getFilteredTodos()
+  }
+
+  getAllTodos(): Todo[] {
+    return this.todos.slice()
+  }
+
+  getActiveTodos(): Todo[] {
+    return this.todos.filter(todo => todo.completed == false)
+  }
+
+  getCompletedTodos(): Todo[] {
+    return this.todos.filter(todo => todo.completed)
+  }
+
+  getCount(): any {
+    return {
+      total: this.todos.length,
+      active: this.getActiveTodos().length,
+      completed: this.getCompletedTodos().length
+    }
+  }
+
+  clear(): void {
+    this.todos = []
+  }
+
+  clearCompleted(): void {
+    this.todos = this.getActiveTodos()
+  }
+
+  completeAll(): void {
+    this.todos.forEach(todo => todo.complete())
+  }
+
+  activateAll(): void {
+    this.todos.forEach(todo => todo.activate())
+  }
+
+  isEmpty(): boolean {
+    return this.todos.length == 0
+  }
+
+  allCompleted(): boolean {
+    return this.todos.length > 0 && this.todos.every(todo => todo.completed)
+  }
+
+  hasCompleted(): boolean {
+    return this.todos.some(todo => todo.completed)
+  }
+  toData(): any[] {
+    return this.todos.map(todo => todo.toData())
+  }
+}
+
+// Filter configuration objects for UI components
+model FilterConfig {
+  label: string
+  value: string
+  isActive: boolean = false
+
+  static createAll(): FilterConfig {
+    return FilterConfig {
+      label: "All",
+      value: FilterType.ALL(),
+      isActive: false
+    }
+  }
+
+  static createActive(): FilterConfig {
+    return FilterConfig {
+      label: "Active",
+      value: FilterType.ACTIVE(),
+      isActive: false
+    }
+  }
+
+  static createCompleted(): FilterConfig {
+    return FilterConfig {
+      label: "Completed",
+      value: FilterType.COMPLETED(),
+      isActive: false
+    }
+  }
+
+  static getAllFilters(): FilterConfig[] {
+    return [
+      FilterConfig.createAll(),
+      FilterConfig.createActive(),
+      FilterConfig.createCompleted()
+    ]
+  }
+
+  setActive(isActive: boolean): void {
+    this.isActive = isActive
+  }
+}
+
+// Validation utilities
+service ValidationService {
+  validateTodoText(text: string): any {
+    const result = {
+      isValid: false,
+      error: null,
+      sanitizedText: ""
+    }
+
+    if (text == null) {
+      result.error = "Text must be a string"
+      return result
+    }
+
+    const trimmed = text.trim()
+    if (trimmed.length == 0) {
+      result.error = "Text cannot be empty"
+      return result
+    }
+
+    if (trimmed.length > 500) {
+      result.error = "Text cannot exceed 500 characters"
+      return result
+    }
+
+    result.isValid = true
+    result.sanitizedText = trimmed
+    return result
+  }
+
+  validateTodoId(id: string): boolean {
+    if (id == null) {
+      return false
+    }
+    if (id.length == 0) {
+      return false
+    }
+    return true
+  }
+
+  validateFilterType(filter: any): boolean {
+    if (filter == FilterType.ALL()) {
+      return true
+    }
+    if (filter == FilterType.ACTIVE()) {
+      return true
+    }
+    if (filter == FilterType.COMPLETED()) {
+      return true
+    }
+    return false
+  }
+}
