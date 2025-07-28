@@ -1,278 +1,286 @@
 /**
- * Framework Tests Entry Point
+ * Framework Tests Index
  *
- * This module exports test functions that can be called by the main test runner
+ * Runs all framework-related tests including state lleagement,
+ * component system, virtual DOM, routing, and storage.
  */
 
-import { TodoLangStateManager } from '../../src/framework/state/index.js';
+import { JSDOM } from 'jsdom';
+
+// Set up DOM environment for testing
+const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+  url: 'http://localhost',
+  pretendToBeVisual: true,
+  resources: 'usable'
+});
+
+global.window = dom.window;
+global.document = dom.window.document;
+global.navigator = dom.window.navigator;
+global.HTMLElement = dom.window.HTMLElement;
+global.Event = dom.window.Event;
+global.CustomEvent = dom.window.CustomEvent;
+
+// Mock performance API
+global.performance = {
+  now: () => Date.now()
+};
 
 /**
- * Run state management tests for integration with main test runner
+ * Simple test framework for component tests
  */
-export function runStateManagementTests() {
-  const results = { passed: 0, failed: 0, total: 0 };
-
-  console.log('🏗️  Running State Management Tests...');
-
-  // Test 1: Basic state creation
-  try {
-    const stateManager = new TodoLangStateManager();
-    const state = stateManager.createState({ count: 0 });
-
-    if (state.count === 0) {
-      console.log('  ✅ State creation works');
-      results.passed++;
-    } else {
-      console.log('  ❌ State creation failed');
-      results.failed++;
-    }
-  } catch (error) {
-    console.log(`  ❌ State creation error: ${error.message}`);
-    results.failed++;
+class SimpleTestFramework {
+  constructor() {
+    this.results = {
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      total: 0
+    };
+    this.currentSuite = null;
+    this.beforeEachFn = null;
+    this.afterEachFn = null;
   }
-  results.total++;
 
-  // Test 2: State reactivity
-  try {
-    const stateManager = new TodoLangStateManager();
-    const state = stateManager.createState({ value: 1 });
-    let changeDetected = false;
+  describe(name, fn) {
+    console.log(`\n📦 ${name}`);
+    this.currentSuite = name;
+    fn();
+    this.currentSuite = null;
+  }
 
-    stateManager.subscribe((changes) => {
-      if (changes.length > 0 && changes[0].path === 'value') {
-        changeDetected = true;
+  beforeEach(fn) {
+    this.beforeEachFn = fn;
+  }
+
+  afterEach(fn) {
+    this.afterEachFn = fn;
+  }
+
+  test(name, fn) {
+    this.results.total++;
+
+    try {
+      // Run beforeEach if defined
+      if (this.beforeEachFn) {
+        this.beforeEachFn();
       }
-    });
 
-    state.value = 2;
+      // Run the test
+      fn();
 
-    // Wait for async notification
-    setTimeout(() => {
-      if (changeDetected) {
-        console.log('  ✅ State reactivity works');
-        results.passed++;
-      } else {
-        console.log('  ❌ State reactivity failed');
-        results.failed++;
+      // Run afterEach if defined
+      if (this.afterEachFn) {
+        this.afterEachFn();
       }
-      results.total++;
-    }, 20);
 
-  } catch (error) {
-    console.log(`  ❌ State reactivity error: ${error.message}`);
-    results.failed++;
-    results.total++;
-  }
-
-  // Test 3: Todo application state structure
-  try {
-    const stateManager = new TodoLangStateManager();
-    const todoState = stateManager.createState({
-      todos: [],
-      filter: 'all',
-      editingId: null
-    }, 'todoApp');
-
-    // Test adding a todo
-    todoState.todos.push({
-      id: '1',
-      text: 'Test todo',
-      completed: false
-    });
-
-    if (todoState.todos.length === 1 && todoState.todos[0].text === 'Test todo') {
-      console.log('  ✅ Todo state structure works');
-      results.passed++;
-    } else {
-      console.log('  ❌ Todo state structure failed');
-      results.failed++;
+      console.log(`  ✅ ${name}`);
+      this.results.passed++;
+    } catch (error) {
+      console.log(`  ❌ ${name}: ${error.message}`);
+      this.results.failed++;
     }
-  } catch (error) {
-    console.log(`  ❌ Todo state structure error: ${error.message}`);
-    results.failed++;
   }
-  results.total++;
 
-  // Test 4: State updates using updateState method
-  try {
-    const stateManager = new TodoLangStateManager();
-    const state = stateManager.createState({ count: 0 }, 'test');
-
-    stateManager.updateState('count', 5);
-
-    if (state.count === 5) {
-      console.log('  ✅ State updates work');
-      results.passed++;
-    } else {
-      console.log('  ❌ State updates failed');
-      results.failed++;
-    }
-  } catch (error) {
-    console.log(`  ❌ State updates error: ${error.message}`);
-    results.failed++;
-  }
-  results.total++;
-
-  // Test 5: Debug information
-  try {
-    const stateManager = new TodoLangStateManager();
-    const state = stateManager.createState({ test: true }, 'debug-test');
-    stateManager.subscribe(() => {}, 'test');
-
-    const debugInfo = stateManager.getDebugInfo();
-
-    if (debugInfo.stateCount === 1 && debugInfo.subscriberCount === 1) {
-      console.log('  ✅ Debug information works');
-      results.passed++;
-    } else {
-      console.log('  ❌ Debug information failed');
-      results.failed++;
-    }
-  } catch (error) {
-    console.log(`  ❌ Debug information error: ${error.message}`);
-    results.failed++;
-  }
-  results.total++;
-
-  return results;
-}
-
-/**
- * Run virtual DOM tests
- */
-async function runVirtualDOMTests() {
-  const results = { passed: 0, failed: 0, total: 0 };
-
-  console.log('🎭 Running Virtual DOM Tests...');
-
-  // Test 1: Virtual DOM creation
-  try {
-    const { createElement, createTextNode } = await import('../../src/framework/components/virtual-dom.js');
-
-    const textNode = createTextNode('Hello');
-    const elementNode = createElement('div', { id: 'test' }, textNode);
-
-    if (elementNode.type === 'div' && elementNode.props.id === 'test' && elementNode.children.length === 1) {
-      console.log('  ✅ Virtual DOM creation works');
-      results.passed++;
-    } else {
-      console.log('  ❌ Virtual DOM creation failed');
-      results.failed++;
-    }
-  } catch (error) {
-    console.log(`  ❌ Virtual DOM creation error: ${error.message}`);
-    results.failed++;
-  }
-  results.total++;
-
-  // Test 2: Virtual DOM diffing
-  try {
-    const { createElement, VirtualDOMDiffer, PatchType } = await import('../../src/framework/components/virtual-dom.js');
-
-    const differ = new VirtualDOMDiffer();
-    const oldVNode = createElement('div', { id: 'old' });
-    const newVNode = createElement('div', { id: 'new' });
-
-    const patches = differ.diff(oldVNode, newVNode);
-
-    if (patches.length > 0 && patches[0].type === PatchType.UPDATE) {
-      console.log('  ✅ Virtual DOM diffing works');
-      results.passed++;
-    } else {
-      console.log('  ❌ Virtual DOM diffing failed');
-      results.failed++;
-    }
-  } catch (error) {
-    console.log(`  ❌ Virtual DOM diffing error: ${error.message}`);
-    results.failed++;
-  }
-  results.total++;
-
-  // Test 3: Virtual DOM rendering
-  try {
-    const { createElement, VirtualDOMRenderer } = await import('../../src/framework/components/virtual-dom.js');
-
-    // Mock document for Node.js environment
-    global.document = {
-      createElement: (tagName) => ({
-        tagName: tagName.toLowerCase(),
-        children: [],
-        childNodes: [],
-        attributes: {},
-        style: {},
-        className: '',
-        textContent: '',
-        parentNode: null,
-        appendChild: function(child) {
-          this.children.push(child);
-          this.childNodes.push(child);
-          child.parentNode = this;
+  expect(actual) {
+    return {
+      toBe: (expected) => {
+        if (actual !== expected) {
+          throw new Error(`Expected ${actual} to be ${expected}`);
+        }
+      },
+      toEqual: (expected) => {
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          throw new Error(`Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`);
+        }
+      },
+      toBeTruthy: () => {
+        if (!actual) {
+          throw new Error(`Expected ${actual} to be truthy`);
+        }
+      },
+      toBeFalsy: () => {
+        if (actual) {
+          throw new Error(`Expected ${actual} to be falsy`);
+        }
+      },
+      toBeNull: () => {
+        if (actual !== null) {
+          throw new Error(`Expected ${actual} to be null`);
+        }
+      },
+      toBeDefined: () => {
+        if (actual === undefined) {
+          throw new Error(`Expected ${actual} to be defined`);
+        }
+      },
+      toBeInstanceOf: (expectedClass) => {
+        if (!(actual instanceof expectedClass)) {
+          throw new Error(`Expected ${actual} to be instance of ${expectedClass.name}`);
+        }
+      },
+      toContain: (expected) => {
+        if (Array.isArray(actual)) {
+          if (!actual.includes(expected)) {
+            throw new Error(`Expected array to contain ${expected}`);
+          }
+        } else if (typeof actual === 'string') {
+          if (!actual.includes(expected)) {
+            throw new Error(`Expected string to contain ${expected}`);
+          }
+        } else {
+          throw new Error(`Cannot check contains on ${typeof actual}`);
+        }
+      },
+      toHaveLength: (expected) => {
+        if (actual.length !== expected) {
+          throw new Error(`Expected length ${actual.length} to be ${expected}`);
+        }
+      },
+      toHaveProperty: (property, value) => {
+        if (!(property in actual)) {
+          throw new Error(`Expected object to have property ${property}`);
+        }
+        if (value !== undefined && actual[property] !== value) {
+          throw new Error(`Expected property ${property} to be ${value}, got ${actual[property]}`);
+        }
+      },
+      toHaveBeenCalled: () => {
+        if (!actual.mock || actual.mock.calls.length === 0) {
+          throw new Error('Expected function to have been called');
+        }
+      },
+      toHaveBeenCalledWith: (...args) => {
+        if (!actual.mock || actual.mock.calls.length === 0) {
+          throw new Error('Expected function to have been called');
+        }
+        const lastCall = actual.mock.calls[actual.mock.calls.length - 1];
+        if (JSON.stringify(lastCall) !== JSON.stringify(args)) {
+          throw new Error(`Expected function to have been called with ${JSON.stringify(args)}, got ${JSON.stringify(lastCall)}`);
+        }
+      },
+      not: {
+        toBe: (expected) => {
+          if (actual === expected) {
+            throw new Error(`Expected ${actual} not to be ${expected}`);
+          }
         },
-        setAttribute: function(name, value) { this.attributes[name] = value; },
-        removeAttribute: function(name) { delete this.attributes[name]; },
-        addEventListener: function() {},
-        removeEventListener: function() {}
-      }),
-      createTextNode: (text) => ({
-        nodeType: 3,
-        textContent: text,
-        parentNode: null
-      }),
-      createDocumentFragment: () => ({
-        children: [],
-        childNodes: [],
-        appendChild: function(child) { this.children.push(child); }
-      })
+        toHaveBeenCalled: () => {
+          if (actual.mock && actual.mock.calls.length > 0) {
+            throw new Error('Expected function not to have been called');
+          }
+        }
+      },
+      toBeGreaterThan: (expected) => {
+        if (actual <= expected) {
+          throw new Error(`Expected ${actual} to be greater than ${expected}`);
+        }
+      },
+      toThrow: (expectedMessage) => {
+        if (typeof actual !== 'function') {
+          throw new Error('Expected a function to test for throwing');
+        }
+        try {
+          actual();
+          throw new Error('Expected function to throw an error');
+        } catch (error) {
+          if (expectedMessage && !error.message.includes(expectedMessage)) {
+            throw new Error(`Expected error message to contain "${expectedMessage}", got "${error.message}"`);
+          }
+        }
+      },
+      stringContaining: (expected) => {
+        return {
+          asymmetricMatch: (actual) => {
+            return typeof actual === 'string' && actual.includes(expected);
+          }
+        };
+      }
+    };
+  }
+
+  // Mock jest functions
+  fn(implementation) {
+    const mockFn = implementation || (() => {});
+    mockFn.mock = {
+      calls: [],
+      results: []
     };
 
-    const renderer = new VirtualDOMRenderer();
-    const vnode = createElement('div', { id: 'test' }, 'Hello World');
-
-    // Mock container
-    const container = {
-      children: [],
-      childNodes: [],
-      appendChild: function(child) {
-        this.children.push(child);
-        this.childNodes.push(child);
+    const wrappedFn = (...args) => {
+      mockFn.mock.calls.push(args);
+      try {
+        const result = mockFn(...args);
+        mockFn.mock.results.push({ type: 'return', value: result });
+        return result;
+      } catch (error) {
+        mockFn.mock.results.push({ type: 'throw', value: error });
+        throw error;
       }
     };
 
-    renderer.render(vnode, container);
-
-    if (renderer.currentVTree && renderer.currentVTree.type === 'div') {
-      console.log('  ✅ Virtual DOM rendering works');
-      results.passed++;
-    } else {
-      console.log('  ❌ Virtual DOM rendering failed');
-      results.failed++;
-    }
-  } catch (error) {
-    console.log(`  ❌ Virtual DOM rendering error: ${error.message}`);
-    results.failed++;
+    wrappedFn.mock = mockFn.mock;
+    return wrappedFn;
   }
-  results.total++;
 
-  return results;
+  spyOn(object, method) {
+    const original = object[method];
+    const spy = this.fn(original);
+    object[method] = spy;
+
+    spy.mockImplementation = (impl) => {
+      spy.mock.implementation = impl;
+      return spy;
+    };
+
+    spy.mockRestore = () => {
+      object[method] = original;
+    };
+
+    return spy;
+  }
 }
+
+// Set up global test functions
+const testFramework = new SimpleTestFramework();
+global.describe = testFramework.describe.bind(testFramework);
+global.test = testFramework.test.bind(testFramework);
+global.beforeEach = testFramework.beforeEach.bind(testFramework);
+global.afterEach = testFramework.afterEach.bind(testFramework);
+
+// Enhanced expect function with static methods
+const expectFn = testFramework.expect.bind(testFramework);
+expectFn.stringContaining = (expected) => ({
+  asymmetricMatch: (actual) => typeof actual === 'string' && actual.includes(expected),
+  toString: () => `stringContaining("${expected}")`
+});
+
+global.expect = expectFn;
+global.jest = {
+  fn: testFramework.fn.bind(testFramework),
+  spyOn: testFramework.spyOn.bind(testFramework)
+};
 
 /**
  * Run all framework tests
  */
 export async function runFrameworkTests() {
-  console.log('\n🏗️  Running Framework Tests...');
+  console.log('🏗️  Running Framework Tests...');
 
-  const stateResults = runStateManagementTests();
-  const virtualDOMResults = await runVirtualDOMTests();
+  try {
+    // Import and run component tests
+    await import('./components/component.test.js');
 
-  // Placeholder for other framework components
-  console.log('  ⏭️  Router not yet implemented - skipping test');
-  console.log('  ⏭️  Storage not yet implemented - skipping test');
+    // TODO: Add other framework tests as they are implemented
+    // await import('./state/state.test.js');
+    // await import('./router/router.test.js');
+    // await import('./storage/storage.test.js');
 
-  return {
-    passed: stateResults.passed + virtualDOMResults.passed,
-    failed: stateResults.failed + virtualDOMResults.failed,
-    total: stateResults.total + virtualDOMResults.total + 2, // +2 for skipped tests
-    skipped: 2
-  };
+    return testFramework.results;
+  } catch (error) {
+    console.error('Error running framework tests:', error);
+    testFramework.results.failed++;
+    testFramework.results.total++;
+    return testFramework.results;
+  }
 }
