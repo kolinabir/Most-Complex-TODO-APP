@@ -138,22 +138,141 @@ export function runStateManagementTests() {
 }
 
 /**
+ * Run virtual DOM tests
+ */
+async function runVirtualDOMTests() {
+  const results = { passed: 0, failed: 0, total: 0 };
+
+  console.log('🎭 Running Virtual DOM Tests...');
+
+  // Test 1: Virtual DOM creation
+  try {
+    const { createElement, createTextNode } = await import('../../src/framework/components/virtual-dom.js');
+
+    const textNode = createTextNode('Hello');
+    const elementNode = createElement('div', { id: 'test' }, textNode);
+
+    if (elementNode.type === 'div' && elementNode.props.id === 'test' && elementNode.children.length === 1) {
+      console.log('  ✅ Virtual DOM creation works');
+      results.passed++;
+    } else {
+      console.log('  ❌ Virtual DOM creation failed');
+      results.failed++;
+    }
+  } catch (error) {
+    console.log(`  ❌ Virtual DOM creation error: ${error.message}`);
+    results.failed++;
+  }
+  results.total++;
+
+  // Test 2: Virtual DOM diffing
+  try {
+    const { createElement, VirtualDOMDiffer, PatchType } = await import('../../src/framework/components/virtual-dom.js');
+
+    const differ = new VirtualDOMDiffer();
+    const oldVNode = createElement('div', { id: 'old' });
+    const newVNode = createElement('div', { id: 'new' });
+
+    const patches = differ.diff(oldVNode, newVNode);
+
+    if (patches.length > 0 && patches[0].type === PatchType.UPDATE) {
+      console.log('  ✅ Virtual DOM diffing works');
+      results.passed++;
+    } else {
+      console.log('  ❌ Virtual DOM diffing failed');
+      results.failed++;
+    }
+  } catch (error) {
+    console.log(`  ❌ Virtual DOM diffing error: ${error.message}`);
+    results.failed++;
+  }
+  results.total++;
+
+  // Test 3: Virtual DOM rendering
+  try {
+    const { createElement, VirtualDOMRenderer } = await import('../../src/framework/components/virtual-dom.js');
+
+    // Mock document for Node.js environment
+    global.document = {
+      createElement: (tagName) => ({
+        tagName: tagName.toLowerCase(),
+        children: [],
+        childNodes: [],
+        attributes: {},
+        style: {},
+        className: '',
+        textContent: '',
+        parentNode: null,
+        appendChild: function(child) {
+          this.children.push(child);
+          this.childNodes.push(child);
+          child.parentNode = this;
+        },
+        setAttribute: function(name, value) { this.attributes[name] = value; },
+        removeAttribute: function(name) { delete this.attributes[name]; },
+        addEventListener: function() {},
+        removeEventListener: function() {}
+      }),
+      createTextNode: (text) => ({
+        nodeType: 3,
+        textContent: text,
+        parentNode: null
+      }),
+      createDocumentFragment: () => ({
+        children: [],
+        childNodes: [],
+        appendChild: function(child) { this.children.push(child); }
+      })
+    };
+
+    const renderer = new VirtualDOMRenderer();
+    const vnode = createElement('div', { id: 'test' }, 'Hello World');
+
+    // Mock container
+    const container = {
+      children: [],
+      childNodes: [],
+      appendChild: function(child) {
+        this.children.push(child);
+        this.childNodes.push(child);
+      }
+    };
+
+    renderer.render(vnode, container);
+
+    if (renderer.currentVTree && renderer.currentVTree.type === 'div') {
+      console.log('  ✅ Virtual DOM rendering works');
+      results.passed++;
+    } else {
+      console.log('  ❌ Virtual DOM rendering failed');
+      results.failed++;
+    }
+  } catch (error) {
+    console.log(`  ❌ Virtual DOM rendering error: ${error.message}`);
+    results.failed++;
+  }
+  results.total++;
+
+  return results;
+}
+
+/**
  * Run all framework tests
  */
-export function runFrameworkTests() {
+export async function runFrameworkTests() {
   console.log('\n🏗️  Running Framework Tests...');
 
   const stateResults = runStateManagementTests();
+  const virtualDOMResults = await runVirtualDOMTests();
 
   // Placeholder for other framework components
-  console.log('  ⏭️  Virtual DOM not yet implemented - skipping test');
   console.log('  ⏭️  Router not yet implemented - skipping test');
   console.log('  ⏭️  Storage not yet implemented - skipping test');
 
   return {
-    passed: stateResults.passed,
-    failed: stateResults.failed,
-    total: stateResults.total + 3, // +3 for skipped tests
-    skipped: 3
+    passed: stateResults.passed + virtualDOMResults.passed,
+    failed: stateResults.failed + virtualDOMResults.failed,
+    total: stateResults.total + virtualDOMResults.total + 2, // +2 for skipped tests
+    skipped: 2
   };
 }

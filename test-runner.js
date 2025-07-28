@@ -325,7 +325,7 @@ class TodoLangTestRunner {
   async runFrameworkTests() {
     try {
       const { runFrameworkTests } = await import('./tests/framework/index.js');
-      const results = runFrameworkTests();
+      const results = await runFrameworkTests();
 
       this.results.passed += results.passed;
       this.results.failed += results.failed;
