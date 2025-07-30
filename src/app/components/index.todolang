@@ -654,3 +654,547 @@ component TodoItem {
     }
   }
 }
+
+// TodoList component for displaying multiple todo items
+component TodoList {
+  state {
+    isLoading: boolean = false
+    error: string = ""
+    selectedItems: string[] = []
+    sortOrder: string = "created" // "created", "alphabetical", "completed"
+    showCompleted: boolean = true
+  }
+
+  render() {
+    <div class={this.getListClass()}>
+      {this.renderContent()}
+    </div>
+  }
+
+  computed getListClass() {
+    let classes = "todo-list"
+    if (this.state.isLoading) {
+      classes = classes + " todo-list-loading"
+    }
+    if (this.state.error.length > 0) {
+      classes = classes + " todo-list-error"
+    }
+    if (this.isEmpty()) {
+      classes = classes + " todo-list-empty"
+    }
+    return classes
+  }
+
+  renderContent() {
+    if (this.state.error.length > 0) {
+      return this.renderError()
+    }
+
+    if (this.state.isLoading) {
+      return this.renderLoading()
+    }
+
+    if (this.isEmpty()) {
+      return this.renderEmptyState()
+    }
+
+    return this.renderTodoItems()
+  }
+
+  renderError() {
+    return (
+      <div class="todo-list-error-container">
+        <div class="todo-list-error-icon">⚠️</div>
+        <div class="todo-list-error-message">{this.state.error}</div>
+        <button
+          class="todo-list-error-retry"
+          onClick={this.handleRetry}
+        >
+          Try Again
+        </button>
+      </div>
+    )
+  }
+
+  renderLoading() {
+    return (
+      <div class="todo-list-loading-container">
+        <div class="todo-list-loading-spinner"></div>
+        <div class="todo-list-loading-text">Loading todos...</div>
+      </div>
+    )
+  }
+
+  renderEmptyState() {
+    const filter = this.props.filter || "all"
+    const emptyMessage = this.getEmptyMessage(filter)
+    const emptyIcon = this.getEmptyIcon(filter)
+
+    return (
+      <div class="todo-list-empty-container">
+        <div class="todo-list-empty-icon">{emptyIcon}</div>
+        <div class="todo-list-empty-message">{emptyMessage}</div>
+        {this.renderEmptyStateActions(filter)}
+      </div>
+    )
+  }
+
+  getEmptyMessage(filter) {
+    if (filter == "active") {
+      return "No active todos! You're all caught up."
+    }
+    if (filter == "completed") {
+      return "No completed todos yet."
+    }
+    return "No todos yet. Add one above to get started!"
+  }
+
+  getEmptyIcon(filter) {
+    if (filter == "active") {
+      return "✅"
+    }
+    if (filter == "completed") {
+      return "📝"
+    }
+    return "📋"
+  }
+
+  renderEmptyStateActions(filter) {
+    if (filter == "active" && this.hasCompletedTodos()) {
+      return (
+        <div class="todo-list-empty-actions">
+          <button
+            class="todo-list-empty-action"
+            onClick={this.handleShowAll}
+          >
+            View All Todos
+          </button>
+        </div>
+      )
+    }
+
+    if (filter == "completed" && this.hasActiveTodos()) {
+      return (
+        <div class="todo-list-empty-actions">
+          <button
+            class="todo-list-empty-action"
+            onClick={this.handleShowActive}
+          >
+            View Active Todos
+          </button>
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  renderTodoItems() {
+    const todos = this.getFilteredAndSortedTodos()
+
+    return (
+      <div class="todo-list-items-container">
+        {this.renderListHeader(todos)}
+        <div class="todo-list-items">
+          {todos.map(todo => this.renderTodoItem(todo))}
+        </div>
+        {this.renderListFooter(todos)}
+      </div>
+    )
+  }
+
+  renderListHeader(todos) {
+    if (todos.length == 0) {
+      return null
+    }
+
+    const totalCount = todos.length
+    const completedCount = todos.filter(todo => todo.completed).length
+    const activeCount = totalCount - completedCount
+
+    return (
+      <div class="todo-list-header">
+        <div class="todo-list-stats">
+          <span class="todo-list-stat">
+            <span class="todo-list-stat-number">{totalCount}</span>
+            <span class="todo-list-stat-label">total</span>
+          </span>
+          <span class="todo-list-stat">
+            <span class="todo-list-stat-number">{activeCount}</span>
+            <span class="todo-list-stat-label">active</span>
+          </span>
+          <span class="todo-list-stat">
+            <span class="todo-list-stat-number">{completedCount}</span>
+            <span class="todo-list-stat-label">completed</span>
+          </span>
+        </div>
+        {this.renderSortControls()}
+      </div>
+    )
+  }
+
+  renderSortControls() {
+    return (
+      <div class="todo-list-sort-controls">
+        <label class="todo-list-sort-label">Sort by:</label>
+        <select
+          class="todo-list-sort-select"
+          value={this.state.sortOrder}
+          onChange={this.handleSortChange}
+        >
+          <option value="created">Date Created</option>
+          <option value="alphabetical">Alphabetical</option>
+          <option value="completed">Completion Status</option>
+        </select>
+      </div>
+    )
+  }
+
+  renderTodoItem(todo) {
+    return (
+      <TodoItem
+        key={todo.id}
+        todo={todo}
+        onToggle={this.props.onToggle}
+        onEdit={this.props.onEdit}
+        onDelete={this.props.onDelete}
+        isSelected={this.isItemSelected(todo.id)}
+        onSelect={this.handleItemSelect}
+      />
+    )
+  }
+
+  renderListFooter(todos) {
+    if (todos.length == 0) {
+      return null
+    }
+
+    const hasCompleted = todos.some(todo => todo.completed)
+    const hasSelected = this.state.selectedItems.length > 0
+
+    return (
+      <div class="todo-list-footer">
+        {this.renderBulkActions(hasSelected)}
+        {this.renderQuickActions(hasCompleted)}
+      </div>
+    )
+  }
+
+  renderBulkActions(hasSelected) {
+    if (hasSelected == false) {
+      return null
+    }
+
+    const selectedCount = this.state.selectedItems.length
+
+    return (
+      <div class="todo-list-bulk-actions">
+        <span class="todo-list-bulk-count">
+          {selectedCount} item{selectedCount == 1 ? "" : "s"} selected
+        </span>
+        <div class="todo-list-bulk-buttons">
+          <button
+            class="todo-list-bulk-complete"
+            onClick={this.handleBulkComplete}
+          >
+            Complete All
+          </button>
+          <button
+            class="todo-list-bulk-delete"
+            onClick={this.handleBulkDelete}
+          >
+            Delete All
+          </button>
+          <button
+            class="todo-list-bulk-clear"
+            onClick={this.handleClearSelection}
+          >
+            Clear Selection
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  renderQuickActions(hasCompleted) {
+    return (
+      <div class="todo-list-quick-actions">
+        {hasCompleted && (
+          <button
+            class="todo-list-quick-action todo-list-clear-completed"
+            onClick={this.handleClearCompleted}
+          >
+            Clear Completed
+          </button>
+        )}
+        <button
+          class="todo-list-quick-action todo-list-select-all"
+          onClick={this.handleSelectAll}
+        >
+          Select All
+        </button>
+      </div>
+    )
+  }
+
+  // Computed properties and utility methods
+  isEmpty() {
+    const todos = this.props.todos || []
+    return todos.length == 0
+  }
+
+  hasActiveTodos() {
+    const todos = this.props.todos || []
+    return todos.some(todo => todo.completed == false)
+  }
+
+  hasCompletedTodos() {
+    const todos = this.props.todos || []
+    return todos.some(todo => todo.completed)
+  }
+
+  getFilteredAndSortedTodos() {
+    let todos = this.props.todos || []
+
+    // Apply filtering based on props.filter
+    const filter = this.props.filter || "all"
+    if (filter == "active") {
+      todos = todos.filter(todo => todo.completed == false)
+    } else if (filter == "completed") {
+      todos = todos.filter(todo => todo.completed)
+    }
+
+    // Apply sorting
+    todos = this.sortTodos(todos, this.state.sortOrder)
+
+    return todos
+  }
+
+  sortTodos(todos, sortOrder) {
+    const sorted = todos.slice() // Create a copy to avoid mutating props
+
+    if (sortOrder == "alphabetical") {
+      sorted.sort((a, b) => {
+        const textA = a.text.toLowerCase()
+        const textB = b.text.toLowerCase()
+        if (textA < textB) return -1
+        if (textA > textB) return 1
+        return 0
+      })
+    } else if (sortOrder == "completed") {
+      sorted.sort((a, b) => {
+        // Incomplete todos first, then completed
+        if (a.completed == b.completed) {
+          // If same completion status, sort by creation date
+          return new Date(b.createdAt) - new Date(a.createdAt)
+        }
+        return a.completed ? 1 : -1
+      })
+    } else {
+      // Default: sort by creation date (newest first)
+      sorted.sort((a, b) => {
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      })
+    }
+
+    return sorted
+  }
+
+  isItemSelected(todoId) {
+    return this.state.selectedItems.includes(todoId)
+  }
+
+  // Event handlers
+  handleRetry(event) {
+    event.preventDefault()
+    this.setState({
+      error: "",
+      isLoading: true
+    })
+
+    // Simulate retry by calling parent refresh if available
+    if (this.props.onRefresh && typeof this.props.onRefresh == "function") {
+      try {
+        this.props.onRefresh()
+        this.setState({ isLoading: false })
+      } catch (error) {
+        this.setState({
+          error: "Failed to refresh todos. Please try again.",
+          isLoading: false
+        })
+      }
+    } else {
+      this.setState({ isLoading: false })
+    }
+  }
+
+  handleShowAll(event) {
+    event.preventDefault()
+    if (this.props.onFilterChange && typeof this.props.onFilterChange == "function") {
+      this.props.onFilterChange("all")
+    }
+  }
+
+  handleShowActive(event) {
+    event.preventDefault()
+    if (this.props.onFilterChange && typeof this.props.onFilterChange == "function") {
+      this.props.onFilterChange("active")
+    }
+  }
+
+  handleSortChange(event) {
+    const newSortOrder = event.target.value
+    this.setState({ sortOrder: newSortOrder })
+
+    // Notify parent of sort change if callback provided
+    if (this.props.onSortChange && typeof this.props.onSortChange == "function") {
+      this.props.onSortChange(newSortOrder)
+    }
+  }
+
+  handleItemSelect(todoId, isSelected) {
+    let selectedItems = this.state.selectedItems.slice()
+
+    if (isSelected) {
+      if (selectedItems.includes(todoId) == false) {
+        selectedItems.push(todoId)
+      }
+    } else {
+      selectedItems = selectedItems.filter(id => id != todoId)
+    }
+
+    this.setState({ selectedItems })
+
+    // Notify parent of selection change
+    if (this.props.onSelectionChange && typeof this.props.onSelectionChange == "function") {
+      this.props.onSelectionChange(selectedItems)
+    }
+  }
+
+  handleSelectAll(event) {
+    event.preventDefault()
+    const todos = this.getFilteredAndSortedTodos()
+    const allIds = todos.map(todo => todo.id)
+    this.setState({ selectedItems: allIds })
+
+    if (this.props.onSelectionChange && typeof this.props.onSelectionChange == "function") {
+      this.props.onSelectionChange(allIds)
+    }
+  }
+
+  handleClearSelection(event) {
+    event.preventDefault()
+    this.setState({ selectedItems: [] })
+
+    if (this.props.onSelectionChange && typeof this.props.onSelectionChange == "function") {
+      this.props.onSelectionChange([])
+    }
+  }
+
+  handleBulkComplete(event) {
+    event.preventDefault()
+    const selectedIds = this.state.selectedItems
+
+    if (selectedIds.length == 0) {
+      return
+    }
+
+    if (this.props.onBulkToggle && typeof this.props.onBulkToggle == "function") {
+      this.props.onBulkToggle(selectedIds, true)
+    }
+
+    // Clear selection after bulk action
+    this.setState({ selectedItems: [] })
+  }
+
+  handleBulkDelete(event) {
+    event.preventDefault()
+    const selectedIds = this.state.selectedItems
+
+    if (selectedIds.length == 0) {
+      return
+    }
+
+    // Show confirmation for bulk delete
+    const confirmMessage = `Are you sure you want to delete ${selectedIds.length} todo${selectedIds.length == 1 ? "" : "s"}?`
+    if (confirm(confirmMessage)) {
+      if (this.props.onBulkDelete && typeof this.props.onBulkDelete == "function") {
+        this.props.onBulkDelete(selectedIds)
+      }
+
+      // Clear selection after bulk action
+      this.setState({ selectedItems: [] })
+    }
+  }
+
+  handleClearCompleted(event) {
+    event.preventDefault()
+    if (this.props.onClearCompleted && typeof this.props.onClearCompleted == "function") {
+      this.props.onClearCompleted()
+    }
+  }
+
+  // Public methods for external control
+  setLoading(isLoading) {
+    this.setState({ isLoading: Boolean(isLoading) })
+  }
+
+  setError(error) {
+    this.setState({
+      error: error || "",
+      isLoading: false
+    })
+  }
+
+  clearError() {
+    this.setState({ error: "" })
+  }
+
+  refresh() {
+    this.handleRetry({ preventDefault: () => {} })
+  }
+
+  getSelectedItems() {
+    return this.state.selectedItems.slice()
+  }
+
+  selectItem(todoId) {
+    this.handleItemSelect(todoId, true)
+  }
+
+  deselectItem(todoId) {
+    this.handleItemSelect(todoId, false)
+  }
+
+  selectAll() {
+    this.handleSelectAll({ preventDefault: () => {} })
+  }
+
+  clearSelection() {
+    this.handleClearSelection({ preventDefault: () => {} })
+  }
+
+  setSortOrder(sortOrder) {
+    if (["created", "alphabetical", "completed"].includes(sortOrder)) {
+      this.setState({ sortOrder })
+    }
+  }
+
+  getSortOrder() {
+    return this.state.sortOrder
+  }
+
+  getStats() {
+    const todos = this.getFilteredAndSortedTodos()
+    const total = todos.length
+    const completed = todos.filter(todo => todo.completed).length
+    const active = total - completed
+
+    return {
+      total,
+      active,
+      completed,
+      selected: this.state.selectedItems.length
+    }
+  }
+}
