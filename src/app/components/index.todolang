@@ -1,2 +1,181 @@
-// TodoLang application components will be implemented here
-// This will be implemented in tasks 12-16
+// TodoLang Application Components
+// UI components for the todo application
+
+// TodoInput component for adding new todos
+component TodoInput {
+  state {
+    inputValue: string = ""
+    isValid: boolean = true
+    errorMessage: string = ""
+    isSubmitting: boolean = false
+  }
+
+  render() {
+    <div class="todo-input-container">
+      <form class="todo-input-form" onSubmit={this.handleSubmit}>
+        <input
+          type="text"
+          class={this.getInputClass()}
+          placeholder="What needs to be done?"
+          value={this.state.inputValue}
+          onInput={this.handleInput}
+          onKeyDown={this.handleKeyDown}
+          disabled={this.state.isSubmitting}
+          autoFocus={true}
+        />
+        <button
+          type="submit"
+          class="todo-input-submit"
+          disabled={this.state.isSubmitting || this.state.inputValue.trim().length == 0}
+        >
+          Add
+        </button>
+      </form>
+      {this.renderErrorMessage()}
+    </div>
+  }
+
+  computed getInputClass() {
+    let classes = "todo-input"
+    if (this.state.isValid == false) {
+      classes = classes + " todo-input-error"
+    }
+    if (this.state.isSubmitting) {
+      classes = classes + " todo-input-submitting"
+    }
+    return classes
+  }
+
+  renderErrorMessage() {
+    if (this.state.isValid == false && this.state.errorMessage.length > 0) {
+      return <div class="todo-input-error-message">{this.state.errorMessage}</div>
+    }
+    return null
+  }
+
+  handleInput(event) {
+    const value = event.target.value
+    this.setState({
+      inputValue: value,
+      isValid: true,
+      errorMessage: ""
+    })
+  }
+
+  handleKeyDown(event) {
+    if (event.key == "Enter") {
+      event.preventDefault()
+      this.submitTodo()
+    }
+  }
+
+  handleSubmit(event) {
+    event.preventDefault()
+    this.submitTodo()
+  }
+
+  submitTodo() {
+    if (this.state.isSubmitting) {
+      return
+    }
+
+    const trimmedValue = this.state.inputValue.trim()
+
+    // Validate input
+    const validation = this.validateInput(trimmedValue)
+    if (validation.isValid == false) {
+      this.setState({
+        isValid: false,
+        errorMessage: validation.error
+      })
+      return
+    }
+
+    // Set submitting state
+    this.setState({
+      isSubmitting: true,
+      isValid: true,
+      errorMessage: ""
+    })
+
+    try {
+      // Call parent callback if provided
+      if (this.props.onAdd && typeof this.props.onAdd == "function") {
+        this.props.onAdd(trimmedValue)
+      }
+
+      // Clear input on successful submission
+      this.clearInput()
+    } catch (error) {
+      this.setState({
+        isValid: false,
+        errorMessage: "Failed to add todo. Please try again."
+      })
+    } finally {
+      this.setState({
+        isSubmitting: false
+      })
+    }
+  }
+
+  validateInput(text) {
+    const result = {
+      isValid: false,
+      error: ""
+    }
+
+    if (text == null || text.length == 0) {
+      result.error = "Todo text cannot be empty"
+      return result
+    }
+
+    if (text.length > 500) {
+      result.error = "Todo text cannot exceed 500 characters"
+      return result
+    }
+
+    // Check for only whitespace
+    if (text.replace(/\s/g, "").length == 0) {
+      result.error = "Todo text cannot be only whitespace"
+      return result
+    }
+
+    result.isValid = true
+    return result
+  }
+
+  clearInput() {
+    this.setState({
+      inputValue: "",
+      isValid: true,
+      errorMessage: "",
+      isSubmitting: false
+    })
+  }
+
+  focus() {
+    // Method to programmatically focus the input
+    if (this._domNode) {
+      const input = this._domNode.querySelector(".todo-input")
+      if (input) {
+        input.focus()
+      }
+    }
+  }
+
+  getValue() {
+    return this.state.inputValue
+  }
+
+  setValue(value) {
+    this.setState({
+      inputValue: value || "",
+      isValid: true,
+      errorMessage: ""
+    })
+  }
+
+  reset() {
+    this.clearInput()
+  }
+}
