@@ -1198,3 +1198,513 @@ component TodoList {
     }
   }
 }
+
+// TodoFilter component for filtering todos by completion status
+component TodoFilter {
+  state {
+    currentFilter: string = "all"
+    isChanging: boolean = false
+    error: string = ""
+    urlSyncEnabled: boolean = true
+  }
+
+  render() {
+    <div class={this.getFilterClass()}>
+      {this.renderFilterButtons()}
+      {this.renderError()}
+    </div>
+  }
+
+  computed getFilterClass() {
+    let classes = "todo-filter"
+    if (this.state.isChanging) {
+      classes = classes + " todo-filter-changing"
+    }
+    if (this.state.error.length > 0) {
+      classes = classes + " todo-filter-error"
+    }
+    return classes
+  }
+
+  renderFilterButtons() {
+    const filters = this.getFilterOptions()
+
+    return (
+      <div class="todo-filter-buttons">
+        <span class="todo-filter-label">Show:</span>
+        <div class="todo-filter-button-group">
+          {filters.map(filter => this.renderFilterButton(filter))}
+        </div>
+      </div>
+    )
+  }
+
+  renderFilterButton(filter) {
+    const isActive = this.isFilterActive(filter.value)
+    const buttonClass = this.getButtonClass(filter.value, isActive)
+
+    return (
+      <button
+        key={filter.value}
+        class={buttonClass}
+        onClick={() => this.handleFilterClick(filter.value)}
+        disabled={this.state.isChanging}
+        title={filter.description}
+        aria-pressed={isActive}
+      >
+        <span class="todo-filter-button-text">{filter.label}</span>
+his.renderFilterCount(filter.value)}
+      </button>
+    )
+  }
+
+  computed getButtonClass() {
+    return (filterValue, isActive) => {
+      let classes = "todo-filter-button"
+      if (isActive) {
+        classes = classes + " todo-filter-button-active"
+      }
+      if (this.state.isChanging) {
+        classes = classes + " todo-filter-button-disabled"
+      }
+      classes = classes + " todo-filter-button-" + filterValue
+      return classes
+    }
+  }
+
+  renderFilterCount(filterValue) {
+    if (this.props.showCounts == false) {
+      return null
+    }
+
+    const count = this.getFilterCount(filterValue)
+    if (count == null) {
+      return null
+    }
+
+    return (
+      <span class="todo-filter-button-count">
+        ({count})
+      </span>
+    )
+  }
+
+  renderError() {
+    if (this.state.error.length == 0) {
+      return null
+    }
+
+    return (
+      <div class="todo-filter-error">
+        <span class="todo-filter-error-icon">⚠️</span>
+        <span class="todo-filter-error-message">{this.state.error}</span>
+        <button
+          class="todo-filter-error-dismiss"
+          onClick={this.handleDismissError}
+          title="Dismiss error"
+        >
+          ×
+        </button>
+      </div>
+    )
+  }
+
+  // Computed properties and utility methods
+  getFilterOptions() {
+    return [
+      {
+        value: "all",
+        label: "All",
+        description: "Show all todos"
+      },
+      {
+        value: "active",
+        label: "Active",
+        description: "Show only incomplete todos"
+      },
+      {
+        value: "completed",
+        label: "Completed",
+        description: "Show only completed todos"
+      }
+    ]
+  }
+
+  isFilterActive(filterValue) {
+    const currentFilter = this.getCurrentFilter()
+    return currentFilter == filterValue
+  }
+
+  getCurrentFilter() {
+    // Priority: props.current > state.currentFilter > URL > default
+    if (this.props.current) {
+      return this.props.current
+    }
+
+    if (this.state.urlSyncEnabled) {
+      const urlFilter = this.getFilterFromUrl()
+      if (urlFilter) {
+        return urlFilter
+      }
+    }
+
+    return this.state.currentFilter
+  }
+
+  getFilterFromUrl() {
+    if (typeof window == "undefined") {
+      return null
+    }
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const filterParam = urlParams.get("filter")
+
+      if (filterParam && this.isValidFilter(filterParam)) {
+        return filterParam
+      }
+
+      // Also check hash-based routing
+      const hash = window.location.hash
+      if (hash.includes("filter=")) {
+        const hashFilter = hash.split("filter=")[1]?.split("&")[0]
+        if (hashFilter && this.isValidFilter(hashFilter)) {
+          return hashFilter
+        }
+      }
+    } catch (error) {
+      console.warn("Error reading filter from URL:", error)
+    }
+
+    return null
+  }
+
+  isValidFilter(filterValue) {
+    const validFilters = this.getFilterOptions().map(f => f.value)
+    return validFilters.includes(filterValue)
+  }
+
+  getFilterCount(filterValue) {
+    if (this.props.todos == null || this.props.todos.length == 0) {
+      return 0
+    }
+
+    const todos = this.props.todos
+
+    if (filterValue == "all") {
+      return todos.length
+    } else if (filterValue == "active") {
+      return todos.filter(todo => todo.completed == false).length
+    } else if (filterValue == "completed") {
+      return todos.filter(todo => todo.completed).length
+    }
+
+    return null
+  }
+
+  // Event handlers
+  handleFilterClick(filterValue) {
+    if (this.state.isChanging) {
+      return
+    }
+
+    if (this.isFilterActive(filterValue)) {
+      return // Already active, no need to change
+    }
+
+    if (this.isValidFilter(filterValue) == false) {
+      this.setState({
+        error: `Invalid filter: ${filterValue}`
+      })
+      return
+    }
+
+    this.setState({
+      isChanging: true,
+      error: ""
+    })
+
+    try {
+      // Update internal state
+      this.setState({
+        currentFilter: filterValue
+      })
+
+      // Update URL if enabled
+      if (this.state.urlSyncEnabled) {
+        this.updateUrl(filterValue)
+      }
+
+all parent callback
+      if (this.props.onChange && typeof this.props.onChange == "function") {
+        this.props.onChange(filterValue)
+      }
+
+      // Persist filter state
+      this.persistFilterState(filterValue)
+
+    } catch (error) {
+      console.error("Error changing filter:", error)
+      this.setState({
+        error: "Failed to change filter. Please try again."
+      })
+    } finally {
+      this.setState({
+        isChanging: false
+      })
+    }
+  }
+
+  handleDismissError(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    this.setState({ error: "" })
+  }
+
+  // URL management
+  updateUrl(filterValue) {
+    if (typeof window == "undefined") {
+      return
+    }
+
+    try {
+      const url = new URL(window.location)
+
+      if (filterValue == "all") {
+        // Remove filter parameter for "all" to keep URLs clean
+        url.searchParams.delete("filter")
+      } else {
+        url.searchParams.set("filter", filterValue)
+      }
+
+      // Update URL without triggering page reload
+      window.history.replaceState(
+        { filter: filterValue },
+        "",
+        url.toString()
+      )
+
+      // Dispatch custom event for other components to listen
+      window.dispatchEvent(new CustomEvent("filterChanged", {
+        detail: { filter: filterValue, source: "url" }
+      }))
+
+    } catch (error) {
+      console.warn("Error updating URL:", error)
+    }
+  }
+
+  // Persistence
+  persistFilterState(filterValue) {
+    if (typeof localStorage == "undefined") {
+      return
+    }
+
+    try {
+      const filterState = {
+        filter: filterValue,
+        timestamp: Date.now()
+      }
+
+      localStorage.setItem("todoapp_filter_state", JSON.stringify(filterState))
+    } catch (error) {
+      console.warn("Error persisting filter state:", error)
+    }
+  }
+
+  loadPersistedFilterState() {
+    if (typeof localStorage == "undefined") {
+      return null
+    }
+
+    try {
+      const stored = localStorage.getItem("todoapp_filter_state")
+      if (stored == null) {
+        return null
+      }
+
+      const filterState = JSON.parse(stored)
+      if (filterState && filterState.filter && this.isValidFilter(filterState.filter)) {
+        return filterState.filter
+      }
+    } catch (error) {
+      console.warn("Error loading persisted filter state:", error)
+    }
+
+    return null
+  }
+
+  clearPersistedFilterState() {
+    if (typeof localStorage == "undefined") {
+      return
+    }
+
+    try {
+      localStorage.removeItem("todoapp_filter_state")
+    } catch (error) {
+      console.warn("Error clearing persisted filter state:", error)
+    }
+  }
+
+  // Lifecycle methods
+  componentDidMount() {
+    // Initialize filter from URL or persisted state
+    this.initializeFilter()
+
+    // Listen for URL changes (browser back/forward)
+    if (typeof window != "undefined" && this.state.urlSyncEnabled) {
+      window.addEventListener("popstate", this.handleUrlChange)
+      window.addEventListener("filterChanged", this.handleExternalFilterChange)
+    }
+  }
+
+  componentWillUnmount() {
+    // Clean up event listeners
+    if (typeof window != "undefined") {
+      window.removeEventListener("popstate", this.handleUrlChange)
+      window.removeEventListener("filterChanged", this.handleExternalFilterChange)
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    // React to prop changes
+    if (prevProps.current != this.props.current) {
+      this.syncWithProps()
+    }
+  }
+
+  initializeFilter() {
+    let initialFilter = "all"
+
+    // Priority: URL > persisted state > props > default
+    const urlFilter = this.getFilterFromUrl()
+    const persistedFilter = this.loadPersistedFilterState()
+
+    if (urlFilter) {
+      initialFilter = urlFilter
+    } else if (persistedFilter) {
+      initialFilter = persistedFilter
+      // Update URL to match persisted state
+      if (this.state.urlSyncEnabled) {
+        this.updateUrl(initialFilter)
+      }
+    } else if (this.props.current && this.isValidFilter(this.props.current)) {
+      initialFilter = this.props.current
+    }
+
+    this.setState({
+      currentFilter: initialFilter
+    })
+
+    // Notify parent of initial filter
+    if (this.props.onChange && typeof this.props.onChange == "function") {
+      this.props.onChange(initialFilter)
+    }
+  }
+
+  syncWithProps() {
+    if (this.props.current && this.isValidFilter(this.props.current)) {
+      const newFilter = this.props.current
+      if (newFilter != this.state.currentFilter) {
+        this.setState({
+          currentFilter: newFilter
+        })
+
+        if (this.state.urlSyncEnabled) {
+          this.updateUrl(newFilter)
+        }
+
+        this.persistFilterState(newFilter)
+      }
+    }
+  }
+
+  handleUrlChange = (event) => {
+    const urlFilter = this.getFilterFromUrl()
+    if (urlFilter && urlFilter != this.state.currentFilter) {
+      this.setState({
+        currentFilter: urlFilter
+      })
+
+      if (this.props.onChange && typeof this.props.onChange == "function") {
+        this.props.onChange(urlFilter)
+      }
+
+      this.persistFilterState(urlFilter)
+    }
+  }
+
+  handleExternalFilterChange = (event) => {
+    // Handle filter changes from other sources
+    if (event.detail && event.detail.filter && event.detail.source != "url") {
+      const newFilter = event.detail.filter
+      if (this.isValidFilter(newFilter) && newFilter != this.state.currentFilter) {
+        this.setState({
+          currentFilter: newFilter
+        })
+      }
+    }
+  }
+
+  // Public methods for external control
+  setFilter(filterValue) {
+    if (this.isValidFilter(filterValue)) {
+      this.handleFilterClick(filterValue)
+      return true
+    }
+    return false
+  }
+
+  getFilter() {
+    return this.getCurrentFilter()
+  }
+
+  resetFilter() {
+    this.setFilter("all")
+  }
+
+  enableUrlSync() {
+    this.setState({ urlSyncEnabled: true })
+  }
+
+  disableUrlSync() {
+    this.setState({ urlSyncEnabled: false })
+  }
+
+  isUrlSyncEnabled() {
+    return this.state.urlSyncEnabled
+  }
+
+  clearError() {
+    this.setState({ error: "" })
+  }
+
+  getFilterStats() {
+    const options = this.getFilterOptions()
+    const stats = {}
+
+    options.forEach(option => {
+      stats[option.value] = {
+        label: option.label,
+        count: this.getFilterCount(option.value),
+        active: this.isFilterActive(option.value)
+      }
+    })
+
+    return stats
+  }
+
+  // Utility methods for testing and debugging
+  getDebugInfo() {
+    return {
+      currentFilter: this.getCurrentFilter(),
+      stateFilter: this.state.currentFilter,
+      urlFilter: this.getFilterFromUrl(),
+      persistedFilter: this.loadPersistedFilterState(),
+      propsFilter: this.props.current,
+      urlSyncEnabled: this.state.urlSyncEnabled,
+      isChanging: this.state.isChanging,
+      error: this.state.error
+    }
+  }
+}

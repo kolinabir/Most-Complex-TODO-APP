@@ -7,6 +7,7 @@ export * from './models.test.js';
 export * from './todo-input.test.js';
 export * from './todo-item.test.js';
 export * from './todo-list.test.js';
+export * from './todo-filter.test.js';
 
 // Test runner for app tests
 export const runAppTests = async () => {
@@ -27,6 +28,10 @@ export const runAppTests = async () => {
   // Import and run TodoList component tests
   const { runTodoListTests } = await import('./todo-list.test.js');
   runTodoListTests();
+
+  // Import and run TodoFilter component tests
+  const { runTodoFilterTests } = await import('./todo-filter.test.js');
+  runTodoFilterTests();
 
   console.log('App Tests completed.');
 };
