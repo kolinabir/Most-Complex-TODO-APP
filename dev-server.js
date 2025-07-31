@@ -31,8 +31,17 @@ class TodoLangDevServer {
     // Initialize builder
     await this.builder.init();
 
-    // Initial build
-    await this.builder.build();
+    // Initial build with error handling
+    try {
+      await this.builder.build();
+      console.log('✅ Initial build completed');
+    } catch (error) {
+      console.error('⚠️  Initial build failed:', error.message);
+      console.log('📝 Development server will serve production build as fallback');
+
+      // Setup production fallback
+      this.setupProductionFallback();
+    }
 
     // Create HTTP server
     this.server = http.createServer((req, res) => {
@@ -219,6 +228,70 @@ class TodoLangDevServer {
     } catch (error) {
       console.error('❌ TodoLang hot reload failed:', error.message);
       throw error;
+    }
+  }
+
+  setupProductionFallback() {
+    console.log('📦 Setting up production build fallback...');
+
+    const deploymentDir = path.join(__dirname, 'deployment');
+
+    if (!fs.existsSync(deploymentDir)) {
+      console.error('❌ Production deployment not found. Please run: node scripts/build-production.js');
+      return;
+    }
+
+    // Ensure dist directory exists
+    if (!fs.existsSync(this.distDir)) {
+      fs.mkdirSync(this.distDir, { recursive: true });
+    }
+
+    try {
+      // Copy production files to dist for development serving
+      const filesToCopy = ['index.html', 'js', 'sw.js'];
+
+      for (const file of filesToCopy) {
+        const srcPath = path.join(deploymentDir, file);
+        const destPath = path.join(this.distDir, file);
+
+        if (fs.existsSync(srcPath)) {
+          const stat = fs.statSync(srcPath);
+
+          if (stat.isDirectory()) {
+            // Copy directory recursively
+            this.copyDirectory(srcPath, destPath);
+          } else {
+            // Copy file
+            fs.copyFileSync(srcPath, destPath);
+          }
+        }
+      }
+
+      console.log('✅ Production fallback ready - serving optimized TodoLang application');
+      console.log('💡 The production build includes the fully functional todo app');
+
+    } catch (error) {
+      console.error('❌ Failed to setup production fallback:', error.message);
+    }
+  }
+
+  copyDirectory(src, dest) {
+    if (!fs.existsSync(dest)) {
+      fs.mkdirSync(dest, { recursive: true });
+    }
+
+    const files = fs.readdirSync(src);
+
+    for (const file of files) {
+      const srcPath = path.join(src, file);
+      const destPath = path.join(dest, file);
+      const stat = fs.statSync(srcPath);
+
+      if (stat.isDirectory()) {
+        this.copyDirectory(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
     }
   }
 

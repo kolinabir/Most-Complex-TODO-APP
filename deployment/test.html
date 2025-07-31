@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoLang Test - Force Fresh Load</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .todo-app {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+
+        .todo-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .todo-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .todo-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .add-btn {
+            padding: 15px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .add-btn:hover {
+            background: #5a67d8;
+        }
+
+        .todo-list {
+            margin-bottom: 30px;
+            min-height: 200px;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e1e5e9;
+            gap: 15px;
+            transition: background-color 0.2s ease;
+        }
+
+        .todo-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .todo-item.completed {
+            opacity: 0.6;
+        }
+
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+        }
+
+        .todo-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .todo-text {
+            flex: 1;
+            font-size: 16px;
+            word-break: break-word;
+        }
+
+        .todo-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #e1e5e9;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: #f8f9fa;
+        }
+
+        .btn-danger {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-edit {
+            color: #667eea;
+            border-color: #667eea;
+        }
+
+        .btn-edit:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .todo-filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid #e1e5e9;
+            background: white;
+            border-radius: 25px;
+            cursor: pointer;
+            color: #666;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .todo-stats {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 60px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .debug {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug">
+        <strong>Debug Info:</strong>
+        <div id="debug-info">Loading...</div>
+    </div>
+
+    <div id="app">
+        <div class="todo-app">
+            <h1>TodoLang Todo Application</h1>
+            <p><strong>Status:</strong> Initializing...</p>
+            <div id="init-status">Waiting for JavaScript to load...</div>
+        </div>
+    </div>
+
+    <!-- Force fresh load with cache busting -->
+    <script src="js/todolang-app.js?v=<?php echo time(); ?>"></script>
+
+    <script>
+        // Debug information
+        document.getElementById('debug-info').innerHTML = `
+            <div>Timestamp: ${new Date().toISOString()}</div>
+            <div>User Agent: ${navigator.userAgent}</div>
+            <div>localStorage available: ${typeof Storage !== 'undefined'}</div>
+            <div>TodoApp available: ${typeof TodoApp !== 'undefined'}</div>
+            <div>Window.TodoApp: ${typeof window.TodoApp}</div>
+        `;
+
+        // Check if TodoApp is available
+        setTimeout(() => {
+            const statusEl = document.getElementById('init-status');
+            if (typeof TodoApp !== 'undefined') {
+                statusEl.innerHTML = '✅ TodoApp class loaded successfully!';
+                statusEl.style.color = 'green';
+
+                // Try to initialize manually
+                try {
+                    const app = new TodoApp();
+                    app.init();
+                    statusEl.innerHTML = '✅ TodoApp initialized successfully!';
+                } catch (error) {
+                    statusEl.innerHTML = `❌ TodoApp initialization failed: ${error.message}`;
+                    statusEl.style.color = 'red';
+                    console.error('TodoApp initialization error:', error);
+                }
+            } else {
+                statusEl.innerHTML = '❌ TodoApp class not found - JavaScript may not have loaded properly';
+                statusEl.style.color = 'red';
+            }
+        }, 1000);
+
+        // Log any JavaScript errors
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript error:', e.error);
+            const statusEl = document.getElementById('init-status');
+            statusEl.innerHTML = `❌ JavaScript error: ${e.error.message}`;
+            statusEl.style.color = 'red';
+        });
+    </script>
+</body>
+</html>

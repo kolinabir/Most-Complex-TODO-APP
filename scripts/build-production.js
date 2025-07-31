@@ -367,11 +367,23 @@ class ProductionBuilder {
   window.TodoApp = TodoApp;
   window.FEATURES = FEATURES;
 
-  // Auto-initialization
+  // Auto-initialization with better debugging
   function initializeTodoLangApp() {
+    console.log('🚀 Starting TodoLang Application initialization...');
+
     try {
+      // Ensure DOM is ready
+      const appElement = document.getElementById('app');
+      if (!appElement) {
+        throw new Error('App container element not found');
+      }
+
+      console.log('📱 Creating TodoApp instance...');
       const app = new TodoApp();
+
+      console.log('⚡ Initializing TodoApp...');
       app.init();
+
       console.log('✅ TodoLang Application initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize TodoLang Application:', error);
@@ -385,8 +397,12 @@ class ProductionBuilder {
               <p>Failed to initialize the TodoLang application. Please refresh the page.</p>
               <details>
                 <summary>Error Details</summary>
-                <pre>\${error.message}</pre>
+                <pre>\${error.message}
+
+Stack trace:
+\${error.stack}</pre>
               </details>
+              <p><small>Check the browser console (F12) for more details.</small></p>
             </div>
           </div>
         \`;
@@ -394,12 +410,22 @@ class ProductionBuilder {
     }
   }
 
-  // Initialize when DOM is ready
+  // Initialize when DOM is ready with multiple fallbacks
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeTodoLangApp);
   } else {
+    // DOM is already ready
     initializeTodoLangApp();
   }
+
+  // Fallback initialization after a short delay
+  setTimeout(() => {
+    const appElement = document.getElementById('app');
+    if (appElement && appElement.innerHTML.includes('Loading application...')) {
+      console.warn('⚠️ App still showing loading state, attempting fallback initialization...');
+      initializeTodoLangApp();
+    }
+  }, 2000);
 
 })(window, document);`;
   }

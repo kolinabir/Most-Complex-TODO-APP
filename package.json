@@ -1,5 +1,5 @@
 {
-  "name": "enterprise-todo-app",
+  "name": "too-complex-todo",
   "version": "1.0.0",
   "description": "An extremely over-engineered todo application built with a custom programming language",
   "type": "module",
@@ -28,9 +28,12 @@
     "over-engineering",
     "dsl",
     "compiler",
-    "framework"
+    "framework",
+    "over-engineered-todo",
+    "todoLang",
+    "todo-framework"
   ],
-  "author": "TodoLang Development Team",
+  "author": "Abir Kolin",
   "license": "MIT",
   "engines": {
     "node": ">=16.0.0"
