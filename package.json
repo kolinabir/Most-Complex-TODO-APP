@@ -7,14 +7,20 @@
   "scripts": {
     "build": "node build.js",
     "build:dev": "node build.js --dev",
-    "build:prod": "node build.js --production --minify --source-maps",
+    "build:prod": "node scripts/build-production.js",
+    "build:prod:analyze": "node scripts/build-production.js --analysis",
     "dev": "node build.js --dev --watch",
     "serve": "node dev-server.js",
+    "serve:prod": "node dev-server.js --dist-dir dist",
     "test": "node test-runner.js",
     "test:language": "node test-runner.js --type lexer,parser,compiler",
-    "test:app": "node test-runner.js --type integration,e2e",
-    "compile": "node compiler/todolang-compiler.js",
-    "clean": "rm -rf dist/*"
+    "test:framework": "node test-runner.js --type framework",
+    "test:integration": "node test-runner.js --type integration",
+    "test:build": "node test-runner.js --type integration && node -e \"import('./tests/integration/build-system.test.js')\"",
+    "test:all": "node test-runner.js --type all",
+    "compile": "node src/main.js",
+    "clean": "rm -rf dist/* .build-temp/* logs/*",
+    "debug": "node src/main.js --mode development --hot-reload --error-reporting"
   },
   "keywords": [
     "todo",

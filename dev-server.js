@@ -172,15 +172,66 @@ class TodoLangDevServer {
     this.rebuildTimeout = setTimeout(async () => {
       try {
         console.log('🔄 Rebuilding application...');
-        await this.builder.build();
+
+        // Use the TodoLang bootstrap for hot reloading
+        if (filePath.endsWith('.todolang')) {
+          await this.handleTodoLangFileChange(filePath);
+        } else {
+          await this.builder.build();
+        }
+
         console.log('✅ Rebuild complete');
 
-        // In a full implementation, this would trigger browser refresh
-        // via WebSocket or Server-Sent Events
+        // Notify connected clients about the change
+        this.notifyClients('reload', { file: filePath });
+
       } catch (error) {
         console.error('❌ Rebuild failed:', error.message);
+        this.notifyClients('error', {
+          message: error.message,
+          stack: error.stack,
+          file: filePath
+        });
       }
     }, 100);
+  }
+
+  async handleTodoLangFileChange(filePath) {
+    console.log(`🔥 Hot reloading TodoLang file: ${filePath}`);
+
+    try {
+      // Import and use the TodoLang bootstrap for hot reloading
+      const { TodoLangBootstrap } = await import('./src/main.js');
+
+      if (!this.bootstrap) {
+        this.bootstrap = new TodoLangBootstrap({
+          mode: 'development',
+          enableHotReload: true,
+          enableErrorReporting: true
+        });
+        await this.bootstrap.start();
+      } else {
+        // Trigger hot reload for the specific file
+        const relativePath = path.relative(path.join(__dirname, 'src', 'app'), filePath);
+        await this.bootstrap.recompileFile(relativePath);
+      }
+
+    } catch (error) {
+      console.error('❌ TodoLang hot reload failed:', error.message);
+      throw error;
+    }
+  }
+
+  notifyClients(type, data) {
+    // In a full implementation, this would use WebSocket or Server-Sent Events
+    // to notify browser clients about changes
+    console.log(`📡 Notify clients: ${type}`, data);
+
+    // For now, we'll just log the notification
+    // In a real implementation, you would:
+    // 1. Maintain a list of connected WebSocket clients
+    // 2. Send the notification to all connected clients
+    // 3. The client-side code would handle the notification (reload, show error, etc.)
   }
 
   cleanup() {
