@@ -1253,7 +1253,7 @@ component TodoFilter {
         aria-pressed={isActive}
       >
         <span class="todo-filter-button-text">{filter.label}</span>
-his.renderFilterCount(filter.value)}
+        {this.renderFilterCount(filter.value)}
       </button>
     )
   }
@@ -1435,7 +1435,7 @@ his.renderFilterCount(filter.value)}
         this.updateUrl(filterValue)
       }
 
-all parent callback
+      // Call parent callback
       if (this.props.onChange && typeof this.props.onChange == "function") {
         this.props.onChange(filterValue)
       }
@@ -1706,5 +1706,906 @@ all parent callback
       isChanging: this.state.isChanging,
       error: this.state.error
     }
+  }
+}
+
+// Main TodoApp component - Root application component
+component TodoApp {
+  state {
+    todos: Todo[] = []
+    currentFilter: string = "all"
+    isLoading: boolean = true
+    error: string = ""
+    isInitialized: boolean = false
+    editingId: string? = null
+    lastSavedAt: Date? = null
+    autoSaveEnabled: boolean = true
+  }
+
+  render() {
+    <div class={this.getAppClass()}>
+      {this.renderHeader()}
+      {this.renderContent()}
+      {this.renderFooter()}
+      {this.renderDebugInfo()}
+    </div>
+  }
+
+  computed getAppClass() {
+    let classes = "todo-app"
+    if (this.state.isLoading) {
+      classes = classes + " todo-app-loading"
+    }
+    if (this.state.error.length > 0) {
+      classes = classes + " todo-app-error"
+    }
+    if (this.isEmpty()) {
+      classes = classes + " todo-app-empty"
+    }
+    if (this.state.isInitialized == false) {
+      classes = classes + " todo-app-initializing"
+    }
+    return classes
+  }
+
+  renderHeader() {
+    return (
+      <header class="todo-app-header">
+        <h1 class="todo-app-title">TodoLang Application</h1>
+        <p class="todo-app-subtitle">Built with custom language and framework</p>
+        {this.renderStats()}
+      </header>
+    )
+  }
+
+  renderStats() {
+    const stats = this.getTodoStats()
+
+    return (
+      <div class="todo-app-stats">
+        <div class="todo-app-stat">
+          <span class="todo-app-stat-number">{stats.total}</span>
+          <span class="todo-app-stat-label">total</span>
+        </div>
+        <div class="todo-app-stat">
+          <span class="todo-app-stat-number">{stats.active}</span>
+          <span class="todo-app-stat-label">active</span>
+        </div>
+        <div class="todo-app-stat">
+          <span class="todo-app-stat-number">{stats.completed}</span>
+          <span class="todo-app-stat-label">completed</span>
+        </div>
+      </div>
+    )
+  }
+
+  renderContent() {
+    if (this.state.error.length > 0) {
+      return this.renderError()
+    }
+
+    if (this.state.isLoading) {
+      return this.renderLoading()
+    }
+
+    return (
+      <main class="todo-app-main">
+        {this.renderInput()}
+        {this.renderFilter()}
+        {this.renderList()}
+      </main>
+    )
+  }
+
+  renderError() {
+    return (
+      <div class="todo-app-error-container">
+        <div class="todo-app-error-icon">⚠️</div>
+        <h2 class="todo-app-error-title">Something went wrong</h2>
+        <p class="todo-app-error-message">{this.state.error}</p>
+        <div class="todo-app-error-actions">
+          <button
+            class="todo-app-error-retry"
+            onClick={this.handleRetry}
+          >
+            Try Again
+          </button>
+          <button
+            class="todo-app-error-reset"
+            onClick={this.handleReset}
+          >
+            Reset Application
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  renderLoading() {
+    return (
+      <div class="todo-app-loading-container">
+        <div class="todo-app-loading-spinner"></div>
+        <p class="todo-app-loading-text">Loading your todos...</p>
+      </div>
+    )
+  }
+
+  renderInput() {
+    return (
+      <div class="todo-app-input-section">
+        <TodoInput
+          onAdd={this.handleAddTodo}
+          disabled={this.state.isLoading}
+          placeholder="What needs to be done?"
+          autoFocus={true}
+        />
+      </div>
+    )
+  }
+
+  renderFilter() {
+    return (
+      <div class="todo-app-filter-section">
+        <TodoFilter
+          current={this.state.currentFilter}
+          onChange={this.handleFilterChange}
+          todos={this.state.todos}
+          showCounts={true}
+        />
+      </div>
+    )
+  }
+
+  renderList() {
+    const filteredTodos = this.getFilteredTodos()
+
+    return (
+      <div class="todo-app-list-section">
+        <TodoList
+          todos={filteredTodos}
+          filter={this.state.currentFilter}
+          onToggle={this.handleToggleTodo}
+          onEdit={this.handleEditTodo}
+          onDelete={this.handleDeleteTodo}
+          onBulkToggle={this.handleBulkToggle}
+          onBulkDelete={this.handleBulkDelete}
+          onClearCompleted={this.handleClearCompleted}
+          onRefresh={this.handleRefresh}
+          onFilterChange={this.handleFilterChange}
+          onSelectionChange={this.handleSelectionChange}
+        />
+      </div>
+    )
+  }
+
+  renderFooter() {
+    if (this.isEmpty()) {
+      return null
+    }
+
+    return (
+      <footer class="todo-app-footer">
+        {this.renderQuickActions()}
+        {this.renderSaveStatus()}
+      </footer>
+    )
+  }
+
+  renderQuickActions() {
+    const hasCompleted = this.hasCompletedTodos()
+    const hasActive = this.hasActiveTodos()
+
+    return (
+      <div class="todo-app-quick-actions">
+        {hasActive && (
+          <button
+            class="todo-app-quick-action"
+            onClick={this.handleCompleteAll}
+            title="Mark all todos as complete"
+          >
+            Complete All
+          </button>
+        )}
+        {hasCompleted && (
+          <button
+            class="todo-app-quick-action"
+            onClick={this.handleClearCompleted}
+            title="Remove all completed todos"
+          >
+            Clear Completed
+          </button>
+        )}
+        <button
+          class="todo-app-quick-action"
+          onClick={this.handleClearAll}
+          title="Remove all todos"
+        >
+          Clear All
+        </button>
+      </div>
+    )
+  }
+
+  renderSaveStatus() {
+    if (this.state.autoSaveEnabled == false) {
+      return null
+    }
+
+    let statusText = ""
+    let statusClass = "todo-app-save-status"
+
+    if (this.state.lastSavedAt) {
+      const timeSince = this.getTimeSinceLastSave()
+      statusText = `Last saved ${timeSince}`
+      statusClass = statusClass + " todo-app-save-status-saved"
+    } else {
+      statusText = "Not saved"
+      statusClass = statusClass + " todo-app-save-status-unsaved"
+    }
+
+    return (
+      <div class={statusClass}>
+        <span class="todo-app-save-status-text">{statusText}</span>
+        <button
+          class="todo-app-save-status-manual"
+          onClick={this.handleManualSave}
+          title="Save now"
+        >
+          Save
+        </button>
+      </div>
+    )
+  }
+
+  renderDebugInfo() {
+    // Only show in development mode
+    if (typeof window != "undefined" && window.location.hostname != "localhost") {
+      return null
+    }
+
+    return (
+      <details class="todo-app-debug">
+        <summary>Debug Info</summary>
+        <pre class="todo-app-debug-content">
+          {JSON.stringify(this.getDebugInfo(), null, 2)}
+        </pre>
+      </details>
+    )
+  }
+
+  // Computed properties
+  computed getFilteredTodos() {
+    return this.state.todos.filter(todo => {
+      if (this.state.currentFilter == "active") {
+        return todo.completed == false
+      }
+      if (this.state.currentFilter == "completed") {
+        return todo.completed
+      }
+      return true // "all"
+    })
+  }
+
+  getTodoStats() {
+    const total = this.state.todos.length
+    const completed = this.state.todos.filter(todo => todo.completed).length
+    const active = total - completed
+
+    return {
+      total,
+      active,
+      completed,
+      percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+    }
+  }
+
+  isEmpty() {
+    return this.state.todos.length == 0
+  }
+
+  hasActiveTodos() {
+    return this.state.todos.some(todo => todo.completed == false)
+  }
+
+  hasCompletedTodos() {
+    return this.state.todos.some(todo => todo.completed)
+  }
+
+  getTimeSinceLastSave() {
+    if (this.state.lastSavedAt == null) {
+      return "never"
+    }
+
+    const now = Date.now()
+    const diff = now - this.state.lastSavedAt.getTime()
+    const seconds = Math.floor(diff / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (seconds < 60) {
+      return "just now"
+    } else if (minutes < 60) {
+      return `${minutes} minute${minutes == 1 ? "" : "s"} ago`
+    } else if (hours < 24) {
+      return `${hours} hour${hours == 1 ? "" : "s"} ago`
+    } else {
+      return this.state.lastSavedAt.toLocaleDateString()
+    }
+  }
+
+  // CRUD Operations
+  handleAddTodo(text) {
+    if (text == null || text.trim().length == 0) {
+      this.setError("Cannot add empty todo")
+      return
+    }
+
+    try {
+      const todo = Todo.create(text.trim())
+      const newTodos = [...this.state.todos, todo]
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("ADD", { todoId: todo.id, text: todo.text })
+
+    } catch (error) {
+      console.error("Error adding todo:", error)
+      this.setError("Failed to add todo: " + error.message)
+    }
+  }
+
+  handleToggleTodo(todoId) {
+    if (todoId == null) {
+      return
+    }
+
+    try {
+      const newTodos = this.state.todos.map(todo => {
+        if (todo.id == todoId) {
+          const updatedTodo = { ...todo }
+          updatedTodo.completed = !updatedTodo.completed
+          return updatedTodo
+        }
+        return todo
+      })
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("TOGGLE", { todoId })
+
+    } catch (error) {
+      console.error("Error toggling todo:", error)
+      this.setError("Failed to toggle todo")
+    }
+  }
+
+  handleEditTodo(todoId, newText) {
+    if (todoId == null || newText == null) {
+      return
+    }
+
+    const trimmedText = newText.trim()
+    if (trimmedText.length == 0) {
+      this.setError("Todo text cannot be empty")
+      return
+    }
+
+    try {
+      const newTodos = this.state.todos.map(todo => {
+        if (todo.id == todoId) {
+          const updatedTodo = { ...todo }
+          updatedTodo.text = trimmedText
+          return updatedTodo
+        }
+        return todo
+      })
+
+      this.setState({
+        todos: newTodos,
+        editingId: null,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("EDIT", { todoId, newText: trimmedText })
+
+    } catch (error) {
+      console.error("Error editing todo:", error)
+      this.setError("Failed to edit todo")
+    }
+  }
+
+  handleDeleteTodo(todoId) {
+    if (todoId == null) {
+      return
+    }
+
+    try {
+      const todoToDelete = this.state.todos.find(todo => todo.id == todoId)
+      const newTodos = this.state.todos.filter(todo => todo.id != todoId)
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("DELETE", {
+        todoId,
+        text: todoToDelete ? todoToDelete.text : "unknown"
+      })
+
+    } catch (error) {
+      console.error("Error deleting todo:", error)
+      this.setError("Failed to delete todo")
+    }
+  }
+
+  // Bulk operations
+  handleBulkToggle(todoIds, completed) {
+    if (todoIds == null || todoIds.length == 0) {
+      return
+    }
+
+    try {
+      const newTodos = this.state.todos.map(todo => {
+        if (todoIds.includes(todo.id)) {
+          const updatedTodo = { ...todo }
+          updatedTodo.completed = Boolean(completed)
+          return updatedTodo
+        }
+        return todo
+      })
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("BULK_TOGGLE", { todoIds, completed })
+
+    } catch (error) {
+      console.error("Error bulk toggling todos:", error)
+      this.setError("Failed to update todos")
+    }
+  }
+
+  handleBulkDelete(todoIds) {
+    if (todoIds == null || todoIds.length == 0) {
+      return
+    }
+
+    try {
+      const newTodos = this.state.todos.filter(todo => !todoIds.includes(todo.id))
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("BULK_DELETE", { todoIds, count: todoIds.length })
+
+    } catch (error) {
+      console.error("Error bulk deleting todos:", error)
+      this.setError("Failed to delete todos")
+    }
+  }
+
+  handleCompleteAll() {
+    try {
+      const newTodos = this.state.todos.map(todo => {
+        const updatedTodo = { ...todo }
+        updatedTodo.completed = true
+        return updatedTodo
+      })
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("COMPLETE_ALL", { count: this.state.todos.length })
+
+    } catch (error) {
+      console.error("Error completing all todos:", error)
+      this.setError("Failed to complete all todos")
+    }
+  }
+
+  handleClearCompleted() {
+    try {
+      const completedCount = this.state.todos.filter(todo => todo.completed).length
+      const newTodos = this.state.todos.filter(todo => todo.completed == false)
+
+      this.setState({
+        todos: newTodos,
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("CLEAR_COMPLETED", { count: completedCount })
+
+    } catch (error) {
+      console.error("Error clearing completed todos:", error)
+      this.setError("Failed to clear completed todos")
+    }
+  }
+
+  handleClearAll() {
+    if (this.state.todos.length == 0) {
+      return
+    }
+
+    const confirmMessage = `Are you sure you want to delete all ${this.state.todos.length} todos? This cannot be undone.`
+    if (confirm(confirmMessage) == false) {
+      return
+    }
+
+    try {
+      const clearedCount = this.state.todos.length
+
+      this.setState({
+        todos: [],
+        error: ""
+      })
+
+      this.saveToStorage()
+      this.logAction("CLEAR_ALL", { count: clearedCount })
+
+    } catch (error) {
+      console.error("Error clearing all todos:", error)
+      this.setError("Failed to clear all todos")
+    }
+  }
+
+  // Filter handling
+  handleFilterChange(newFilter) {
+    if (newFilter == null || newFilter == this.state.currentFilter) {
+      return
+    }
+
+    const validFilters = ["all", "active", "completed"]
+    if (validFilters.includes(newFilter) == false) {
+      this.setError("Invalid filter: " + newFilter)
+      return
+    }
+
+    this.setState({
+      currentFilter: newFilter,
+      error: ""
+    })
+
+    this.logAction("FILTER_CHANGE", { filter: newFilter })
+  }
+
+  // Other event handlers
+  handleSelectionChange(selectedIds) {
+    // Handle selection changes from TodoList component
+    // This could be used for bulk operations UI feedback
+    this.logAction("SELECTION_CHANGE", { selectedIds })
+  }
+
+  handleRefresh() {
+    this.loadFromStorage()
+  }
+
+  handleRetry() {
+    this.setState({
+      error: "",
+      isLoading: true
+    })
+
+    this.initialize()
+  }
+
+  handleReset() {
+    const confirmMessage = "Are you sure you want to reset the application? This will clear all data and cannot be undone."
+    if (confirm(confirmMessage) == false) {
+      return
+    }
+
+    try {
+      this.clearStorage()
+      this.setState({
+        todos: [],
+        currentFilter: "all",
+        isLoading: false,
+        error: "",
+        isInitialized: true,
+        editingId: null,
+        lastSavedAt: null
+      })
+
+      this.logAction("RESET", {})
+
+    } catch (error) {
+      console.error("Error resetting application:", error)
+      this.setError("Failed to reset application")
+    }
+  }
+
+  handleManualSave() {
+    this.saveToStorage()
+  }
+
+  // Storage operations
+  saveToStorage() {
+    if (this.state.autoSaveEnabled == false) {
+      return
+    }
+
+    try {
+      const dataToSave = {
+        todos: this.state.todos.map(todo => todo.toData()),
+        currentFilter: this.state.currentFilter,
+        savedAt: Date.now(),
+        version: "1.0"
+      }
+
+      const storageService = this.getStorageService()
+      storageService.setItem("todoapp_data", dataToSave)
+
+      this.setState({
+        lastSavedAt: new Date(),
+        error: ""
+      })
+
+    } catch (error) {
+      console.error("Error saving to storage:", error)
+      this.setError("Failed to save data: " + error.message)
+    }
+  }
+
+  loadFromStorage() {
+    try {
+      const storageService = this.getStorageService()
+      const savedData = storageService.getItem("todoapp_data")
+
+      if (savedData == null) {
+        // No saved data, start with empty state
+        this.setState({
+          todos: [],
+          currentFilter: "all",
+          isLoading: false,
+          isInitialized: true,
+          lastSavedAt: null
+        })
+        return
+      }
+
+      // Validate and restore saved data
+      const todos = (savedData.todos || []).map(todoData => Todo.fromData(todoData))
+      const currentFilter = savedData.currentFilter || "all"
+      const lastSavedAt = savedData.savedAt ? new Date(savedData.savedAt) : null
+
+      this.setState({
+        todos,
+        currentFilter,
+        isLoading: false,
+        isInitialized: true,
+        lastSavedAt,
+        error: ""
+      })
+
+      this.logAction("LOAD", { count: todos.length, filter: currentFilter })
+
+    } catch (error) {
+      console.error("Error loading from storage:", error)
+      this.setError("Failed to load saved data: " + error.message)
+
+      // Fall back to empty state
+      this.setState({
+        todos: [],
+        currentFilter: "all",
+        isLoading: false,
+        isInitialized: true,
+        lastSavedAt: null
+      })
+    }
+  }
+
+  clearStorage() {
+    try {
+      const storageService = this.getStorageService()
+      storageService.removeItem("todoapp_data")
+      storageService.removeItem("todoapp_filter_state")
+
+      this.setState({
+        lastSavedAt: null
+      })
+
+    } catch (error) {
+      console.error("Error clearing storage:", error)
+      throw error
+    }
+  }
+
+  getStorageService() {
+    // This would be injected via dependency injection in a real implementation
+    // For now, we'll use a simple localStorage wrapper
+    return {
+      setItem: (key, value) => {
+        localStorage.setItem(key, JSON.stringify(value))
+      },
+      getItem: (key) => {
+        const item = localStorage.getItem(key)
+        return item ? JSON.parse(item) : null
+      },
+      removeItem: (key) => {
+        localStorage.removeItem(key)
+      }
+    }
+  }
+
+  // Lifecycle methods
+  componentDidMount() {
+    this.initialize()
+  }
+
+  componentWillUnmount() {
+    // Save any pending changes
+    if (this.state.autoSaveEnabled) {
+      this.saveToStorage()
+    }
+  }
+
+  initialize() {
+    this.setState({
+      isLoading: true,
+      error: ""
+    })
+
+    try {
+      // Load saved data
+      this.loadFromStorage()
+
+      // Set up auto-save interval
+      if (this.state.autoSaveEnabled) {
+        this.setupAutoSave()
+      }
+
+    } catch (error) {
+      console.error("Error initializing application:", error)
+      this.setError("Failed to initialize application: " + error.message)
+
+      this.setState({
+        isLoading: false,
+        isInitialized: true
+      })
+    }
+  }
+
+  setupAutoSave() {
+    // Auto-save every 30 seconds
+    if (this._autoSaveInterval) {
+      clearInterval(this._autoSaveInterval)
+    }
+
+    this._autoSaveInterval = setInterval(() => {
+      if (this.state.autoSaveEnabled) {
+        this.saveToStorage()
+      }
+    }, 30000)
+  }
+
+  // Utility methods
+  setError(message) {
+    this.setState({
+      error: message || "",
+      isLoading: false
+    })
+  }
+
+  clearError() {
+    this.setState({ error: "" })
+  }
+
+  logAction(action, data) {
+    // Simple action logging for debugging
+    if (typeof console != "undefined") {
+      console.log(`[TodoApp] ${action}:`, data)
+    }
+  }
+
+  getDebugInfo() {
+    return {
+      state: {
+        todosCount: this.state.todos.length,
+        currentFilter: this.state.currentFilter,
+        isLoading: this.state.isLoading,
+        error: this.state.error,
+        isInitialized: this.state.isInitialized,
+        editingId: this.state.editingId,
+        lastSavedAt: this.state.lastSavedAt,
+        autoSaveEnabled: this.state.autoSaveEnabled
+      },
+      computed: {
+        filteredTodosCount: this.getFilteredTodos().length,
+        stats: this.getTodoStats(),
+        isEmpty: this.isEmpty(),
+        hasActive: this.hasActiveTodos(),
+        hasCompleted: this.hasCompletedTodos()
+      },
+      storage: {
+        hasAutoSaveInterval: Boolean(this._autoSaveInterval)
+      }
+    }
+  }
+
+  // Public API methods for external control
+  addTodo(text) {
+    this.handleAddTodo(text)
+  }
+
+  toggleTodo(todoId) {
+    this.handleToggleTodo(todoId)
+  }
+
+  editTodo(todoId, newText) {
+    this.handleEditTodo(todoId, newText)
+  }
+
+  deleteTodo(todoId) {
+    this.handleDeleteTodo(todoId)
+  }
+
+  setFilter(filter) {
+    this.handleFilterChange(filter)
+  }
+
+  getFilter() {
+    return this.state.currentFilter
+  }
+
+  getTodos() {
+    return this.state.todos.slice()
+  }
+
+  getFilteredTodos() {
+    return this.getFilteredTodos()
+  }
+
+  getStats() {
+    return this.getTodoStats()
+  }
+
+  save() {
+    this.saveToStorage()
+  }
+
+  load() {
+    this.loadFromStorage()
+  }
+
+  reset() {
+    this.handleReset()
+  }
+
+  enableAutoSave() {
+    this.setState({ autoSaveEnabled: true })
+    this.setupAutoSave()
+  }
+
+  disableAutoSave() {
+    this.setState({ autoSaveEnabled: false })
+    if (this._autoSaveInterval) {
+      clearInterval(this._autoSaveInterval)
+      this._autoSaveInterval = null
+    }
+  }
+
+  isAutoSaveEnabled() {
+    return this.state.autoSaveEnabled
   }
 }
