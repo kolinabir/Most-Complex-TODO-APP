@@ -68,14 +68,54 @@ This project demonstrates what happens when you apply enterprise-level architect
 1. Clone the repository
 2. No external dependencies needed - everything is built from scratch!
 
+## Running the Application
+
+### 🚀 Quick Start (Production App)
+
+To run the **complete, working TodoLang application**:
+
+```bash
+# Option 1: Use the built-in test server
+node test-deployment.js
+# Then open: http://localhost:8080
+
+# Option 2: Use any static file server
+cd deployment
+python -m http.server 8080
+# or
+npx serve . -p 8080
+# Then open: http://localhost:8080
+
+# Option 3: Double-click deployment/index.html
+```
+
+### 🛠️ Development Server
+
+For **development work** (shows build status and redirects to production):
+
+```bash
+# Start development server
+node dev-server.js
+# Then open: http://localhost:3000
+
+# Custom port
+node dev-server.js --port 8080
+```
+
+**Note**: The development server shows a "Production Ready" page with links to the actual working app, since the TodoLang compiler is still being developed.
+
 ### Development Commands
 
 ```bash
-# Build the project
+# Build the project (development mode)
 node build.js --dev
 
 # Start development server with hot reloading
 node dev-server.js
+# Then open: http://localhost:3000
+
+# Start development server on custom port
+node dev-server.js --port 8080
 
 # Run tests
 node test-runner.js
@@ -83,9 +123,20 @@ node test-runner.js
 # Run specific test types
 node test-runner.js --type integration
 node test-runner.js --type lexer,parser,compiler
+```
 
-# Build for production
-node build.js --production --minify --source-maps
+### Production Commands
+
+```bash
+# Create optimized production build
+node scripts/build-production.js
+
+# Test the production deployment locally
+node test-deployment.js
+# Then open: http://localhost:8080
+
+# Validate the production package
+node scripts/validate-deployment.js
 ```
 
 ## Production Deployment
@@ -109,16 +160,20 @@ After implementing 20 major tasks including building a custom programming langua
 The production deployment is available in the `deployment/` directory:
 
 ```bash
-# Serve the production build locally
-cd deployment
-python -m http.server 8000
-# or
-npx serve .
+# Quick start - use the built-in test server
+node test-deployment.js
+# Then open http://localhost:8080
 
-# Then open http://localhost:8000
+# Alternative - serve files directly
+cd deployment
+python -m http.server 8080
+# or
+npx serve . -p 8080
 ```
 
 **Features**: Add, edit, delete, and filter todos with persistent storage, URL routing, and offline functionality - all powered by our custom TodoLang language!
+
+📋 **See [QUICK-START.md](QUICK-START.md) for detailed server instructions**
 
 ## TodoLang Language Preview
 
@@ -213,7 +268,7 @@ node dev-server.js --port 3000
 
 ## Contributing
 
-This is an educational project demonstrating extreme over-engineering. Each component is built from scratch to show how modern web frameworks work under the hood.
+This is an hobby project demonstrating extreme over-engineering. Each component is built from scratch to show how modern web frameworks work under the hood. 
 
 ## License
 

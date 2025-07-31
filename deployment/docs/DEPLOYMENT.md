@@ -18,15 +18,35 @@ This optimized production build includes:
 
 ## Quick Deployment
 
-### Static Hosting (Recommended)
+### Local Testing (Recommended First Step)
+
+Before deploying to production, test locally:
+
+```bash
+# Option 1: Use the built-in test server
+node test-deployment.js
+# Then open: http://localhost:8080
+
+# Option 2: Use Python's built-in server
+cd deployment
+python -m http.server 8080
+# Then open: http://localhost:8080
+
+# Option 3: Use Node.js serve
+cd deployment
+npx serve . -p 8080
+# Then open: http://localhost:8080
+```
+
+### Static Hosting (Production)
 
 1. **Upload Files**
-   - Upload all files to your web server's public directory
+   - Upload all files from the `deployment/` directory to your web server's public directory
    - Ensure `index.html` is accessible at your domain root
 
 2. **Verify**
    - Access your domain in a browser
-   - The application should load automatically
+   - The TodoLang application should load automatically with full functionality
 
 ## Deployment Platforms
 
