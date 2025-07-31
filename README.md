@@ -17,7 +17,7 @@ This project is called the "TOO Complex Todo App" because it represents the pinn
 
 ## Project Overview
 
-This project demonstrates what happens when you apply enterprise-level architecture patterns to the world's simplest application. We've created a custom domain-specific language (DSL) from scratch, built an entire framework stack, and implemented a todo application using our custom language - all to manage a list of tasks that could be done with basic HTML and JavaScript.
+This project demonstrates what happens when you apply enterprise-level architecture patterns to the world's simplest application. We've created a custom domain-specific language (DSL) from scratch, built an entire framework stack, and implemented a todo application using our custom language - all to manage a list of tasks that could be done with basic HTML and JavaScript. 
 
 ### What We're Building
 
@@ -29,9 +29,6 @@ This project demonstrates what happens when you apply enterprise-level architect
 ## Project Structure
 
 ```
-├── .kiro/
-│   ├── specs/enterprise-todo-app/     # Project specifications
-│   └── steering/                      # AI assistant guidance
 ├── src/
 │   ├── language/                      # TodoLang compiler implementation
 │   │   ├── lexer/                    # Tokenization logic
@@ -268,7 +265,7 @@ node dev-server.js --port 3000
 
 ## Contributing
 
-This is an hobby project demonstrating extreme over-engineering. Each component is built from scratch to show how modern web frameworks work under the hood. 
+This is an hobby project demonstrating extreme over-engineering. Each component is built from scratch to show how modern web frameworks work under the hood.
 
 ## License
 
