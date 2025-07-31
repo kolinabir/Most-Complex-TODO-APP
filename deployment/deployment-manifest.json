@@ -1,0 +1,86 @@
+{
+  "name": "TodoLang Todo Application",
+  "version": "1.0.0",
+  "description": "An extremely over-engineered todo application built with a custom domain-specific language",
+  "buildTime": "2025-07-31T12:28:48.156Z",
+  "buildMode": "production",
+  "package": {
+    "totalSize": "55.8 KB",
+    "fileCount": 6,
+    "compressionEnabled": true,
+    "polyfillsIncluded": true
+  },
+  "browserSupport": {
+    "chrome": "60+",
+    "firefox": "55+",
+    "safari": "12+",
+    "edge": "79+",
+    "ie": "11+ (with polyfills)"
+  },
+  "features": [
+    "Add, edit, delete todo items",
+    "Mark todos as complete/incomplete",
+    "Filter todos by status",
+    "Persistent localStorage",
+    "URL-based routing",
+    "Responsive design",
+    "Offline functionality"
+  ],
+  "technical": {
+    "language": "TodoLang (custom DSL)",
+    "framework": "Custom component framework",
+    "stateManagement": "Custom reactive state system",
+    "storage": "localStorage with graceful degradation",
+    "dependencies": "None (self-contained)",
+    "bundleSize": "~50KB (minified)"
+  },
+  "files": [
+    {
+      "path": "docs\\DEPLOYMENT.md",
+      "size": "6.19 KB",
+      "type": "md"
+    },
+    {
+      "path": "docs\\SETUP.md",
+      "size": "4.61 KB",
+      "type": "md"
+    },
+    {
+      "path": "index.html",
+      "size": "8.57 KB",
+      "type": "html"
+    },
+    {
+      "path": "js\\polyfills.js",
+      "size": "5.3 KB",
+      "type": "js"
+    },
+    {
+      "path": "js\\todolang-app.js",
+      "size": "29.25 KB",
+      "type": "js"
+    },
+    {
+      "path": "README.md",
+      "size": "1.87 KB",
+      "type": "md"
+    }
+  ],
+  "deployment": {
+    "requirements": [
+      "Web server capable of serving static files",
+      "Modern web browser with JavaScript enabled"
+    ],
+    "instructions": "See docs/SETUP.md and docs/DEPLOYMENT.md",
+    "quickStart": [
+      "Upload all files to web server",
+      "Ensure static file serving is enabled",
+      "Access index.html in browser"
+    ]
+  },
+  "support": {
+    "documentation": "docs/",
+    "troubleshooting": "docs/SETUP.md#troubleshooting",
+    "browserConsole": "Check F12 developer tools for errors"
+  }
+}

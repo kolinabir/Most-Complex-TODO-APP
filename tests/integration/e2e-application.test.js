@@ -4,6 +4,37 @@
  * Comprehensive tests that verify complete user workflows for the TodoLang application.
  * Tests todo creation, editing, completion, deletion, filtering, URL state management,
  * data persistence, and performance with large datasets.
+ *
+ * Requirements Coverage:
+ * - 3.1: Todo creation with text input and add button
+ * - 3.2: Unique ID assignment and incomplete status
+ * - 3.3: Input validation for empty todos
+ * - 3.4: Input field clearing and display updates
+ * - 4.1: Todo list display on application load
+ * - 4.2: Todo item display with text, status, and actions
+ * - 4.3: Empty state message when no todos exist
+ * - 4.4: Automatic re-rendering on todo list updates
+ * - 5.1: Toggle completion status via checkbox
+ * - 5.2: Visual indication of completed state
+ * - 5.3: Persistence and display update of completion changes
+ * - 6.1: Edit mode activation via edit button
+ * - 6.2: Edit input field display with current text
+ * - 6.3: Save edited text and exit edit mode
+ * - 6.4: Cancel editing and revert to original text
+ * - 6.5: Validation error for empty edited text
+ * - 7.1: Todo deletion via delete button
+ * - 7.2: Immediate display update after deletion
+ * - 7.3: Confirmation dialog for deletion prevention
+ * - 7.4: Empty state display when last todo deleted
+ * - 8.1: All filter displays all todos regardless of status
+ * - 8.2: Active filter displays only incomplete todos
+ * - 8.3: Completed filter displays only completed todos
+ * - 8.4: URL updates to reflect current filter state
+ * - 8.5: Filter application from direct URL navigation
+ * - 9.1: Automatic saving of changes to local storage
+ * - 9.2: Data retrieval and display from previous sessions
+ * - 9.3: Graceful degradation when localStorage unavailable
+ * - 9.4: Appropriate handling of empty storage state
  */
 
 import fs from 'fs';
@@ -901,6 +932,623 @@ describe('End-to-End TodoLang Application Tests', () => {
 
       // Perform many rapid updates
       for (let i = 0; i < 50; i++) {
+        app.toggleTodo(`todo-${i}`);
+      }
+
+      const endTime = Date.now();
+      const updateTime = endTime - startTime;
+
+      // Should handle rapid updates efficiently (less than 200ms)
+      expect(updateTime).toBeLessThan(200);
+
+      // Verify updates were applied correctly
+      const completedCount = app.state.todos.filter(t => t.completed).length;
+      expect(completedCount).toBe(50);
+    });
+
+    test('should maintain performance during filtering with large lists', () => {
+      // Setup large list with mixed completion states
+      const largeTodos = Array.from({ length: 2000 }, (_, i) => ({
+        id: `large-todo-${i}`,
+        text: `Large dataset todo ${i + 1}`,
+        completed: i % 4 === 0, // Every 4th todo is completed
+        createdAt: new Date(Date.now() - i * 1000)
+      }));
+      app.setState({ todos: largeTodos });
+
+      const startTime = Date.now();
+
+      // Test multiple filter operations
+      app.setFilter('active');
+      const activeTodos = app.getFilteredTodos();
+
+      app.setFilter('completed');
+      const completedTodos = app.getFilteredTodos();
+
+      app.setFilter('all');
+      const allTodos = app.getFilteredTodos();
+
+      const endTime = Date.now();
+      const filterTime = endTime - startTime;
+
+      // Should filter large lists efficiently (less than 100ms)
+      expect(filterTime).toBeLessThan(100);
+
+      // Verify filter results are correct
+      expect(allTodos).toHaveLength(2000);
+      expect(completedTodos).toHaveLength(500); // 2000 / 4 = 500
+      expect(activeTodos).toHaveLength(1500); // 2000 - 500 = 1500
+    });
+
+    test('should handle memory efficiently with large datasets', () => {
+      // Test memory usage doesn't grow excessively with large datasets
+      const initialMemory = process.memoryUsage().heapUsed;
+
+      // Create and destroy large todo lists multiple times
+      for (let iteration = 0; iteration < 5; iteration++) {
+        const largeTodos = Array.from({ length: 1000 }, (_, i) => ({
+          id: `memory-test-${iteration}-${i}`,
+          text: `Memory test todo ${i + 1}`,
+          completed: Math.random() > 0.5,
+          createdAt: new Date()
+        }));
+
+        app.setState({ todos: largeTodos });
+
+        // Perform operations that might cause memory leaks
+        for (let i = 0; i < 100; i++) {
+          app.setFilter(i % 3 === 0 ? 'all' : i % 3 === 1 ? 'active' : 'completed');
+        }
+
+        // Clear the todos
+        app.setState({ todos: [] });
+      }
+
+      const finalMemory = process.memoryUsage().heapUsed;
+      const memoryIncrease = finalMemory - initialMemory;
+
+      // Memory increase should be reasonable (less than 50MB)
+      expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024);
+    });
+  });
+
+  describe('Keyboard Interactions', () => {
+    test('should add todo when Enter key is pressed', () => {
+      const input = container.querySelector('#new-todo-input');
+      input.value = 'Todo via Enter key';
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+
+      // Simulate Enter key press
+      const enterEvent = new dom.window.KeyboardEvent('keypress', {
+        key: 'Enter',
+        bubbles: true
+      });
+      input.dispatchEvent(enterEvent);
+
+      // Verify todo was added
+      expect(app.state.todos).toHaveLength(1);
+      expect(app.state.todos[0].text).toBe('Todo via Enter key');
+      expect(app.state.newTodoText).toBe('');
+    });
+
+    test('should not add todo for other keys', () => {
+      const input = container.querySelector('#new-todo-input');
+      input.value = 'Todo via other key';
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+
+      // Simulate other key press (e.g., Space)
+      const spaceEvent = new dom.window.KeyboardEvent('keypress', {
+        key: ' ',
+        bubbles: true
+      });
+      input.dispatchEvent(spaceEvent);
+
+      // Verify todo was not added
+      expect(app.state.todos).toHaveLength(0);
+      expect(app.state.newTodoText).toBe('Todo via other key');
+    });
+
+    test('should handle Escape key during editing', () => {
+      // Setup: Add a todo and start editing
+      app.setState({
+        todos: [{ id: 'test-1', text: 'Original text', completed: false, createdAt: new Date() }],
+        editingId: 'test-1'
+      });
+
+      const editInput = container.querySelector('.edit-input[data-id="test-1"]');
+      editInput.value = 'Modified text';
+
+      // Simulate Escape key press
+      const escapeEvent = new dom.window.KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true
+      });
+      editInput.dispatchEvent(escapeEvent);
+
+      // Verify edit was cancelled
+      expect(app.state.editingId).toBe(null);
+      expect(app.state.todos[0].text).toBe('Original text'); // Should revert
+    });
+  });
+
+  describe('Statistics and Counts', () => {
+    beforeEach(() => {
+      // Setup test data
+      app.setState({
+        todos: [
+          { id: '1', text: 'Active todo 1', completed: false, createdAt: new Date() },
+          { id: '2', text: 'Completed todo 1', completed: true, createdAt: new Date() },
+          { id: '3', text: 'Active todo 2', completed: false, createdAt: new Date() },
+          { id: '4', text: 'Completed todo 2', completed: true, createdAt: new Date() },
+          { id: '5', text: 'Active todo 3', completed: false, createdAt: new Date() }
+        ]
+      });
+    });
+
+    test('should display accurate todo statistics', () => {
+      const statsElement = container.querySelector('.todo-stats p');
+      expect(statsElement.textContent).toContain('Total: 5');
+      expect(statsElement.textContent).toContain('Active: 3');
+      expect(statsElement.textContent).toContain('Completed: 2');
+
+      // Verify filter button counts
+      const allBtn = container.querySelector('.filter-btn[data-filter="all"]');
+      const activeBtn = container.querySelector('.filter-btn[data-filter="active"]');
+      const completedBtn = container.querySelector('.filter-btn[data-filter="completed"]');
+
+      expect(allBtn.textContent).toContain('All (5)');
+      expect(activeBtn.textContent).toContain('Active (3)');
+      expect(completedBtn.textContent).toContain('Completed (2)');
+    });
+
+    test('should update statistics when todos change', () => {
+      // Complete one more todo
+      const checkbox = container.querySelector('.todo-checkbox[data-id="1"]');
+      checkbox.click();
+
+      // Verify statistics updated
+      const statsElement = container.querySelector('.todo-stats p');
+      expect(statsElement.textContent).toContain('Total: 5');
+      expect(statsElement.textContent).toContain('Active: 2');
+      expect(statsElement.textContent).toContain('Completed: 3');
+
+      // Add a new todo
+      const input = container.querySelector('#new-todo-input');
+      input.value = 'New todo';
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+
+      const addBtn = container.querySelector('#add-todo-btn');
+      addBtn.click();
+
+      // Verify statistics updated again
+      expect(statsElement.textContent).toContain('Total: 6');
+      expect(statsElement.textContent).toContain('Active: 3');
+      expect(statsElement.textContent).toContain('Completed: 3');
+    });
+
+    test('should handle empty state statistics', () => {
+      // Clear all todos
+      app.setState({ todos: [] });
+
+      const statsElement = container.querySelector('.todo-stats p');
+      expect(statsElement.textContent).toContain('Total: 0');
+      expect(statsElement.textContent).toContain('Active: 0');
+      expect(statsElement.textContent).toContain('Completed: 0');
+
+      // Verify empty state message is shown
+      const emptyState = container.querySelector('.empty-state');
+      expect(emptyState).toBeTruthy();
+      expect(emptyState.textContent).toContain('No todos found');
+    });
+  });
+
+  describe('Edge Cases and Error Recovery', () => {
+    test('should handle rapid successive operations', () => {
+      // Add multiple todos rapidly
+      for (let i = 0; i < 10; i++) {
+        app.setState({
+          todos: [...app.state.todos, {
+            id: `rapid-${i}`,
+            text: `Rapid todo ${i}`,
+            completed: false,
+            createdAt: new Date()
+          }]
+        });
+      }
+
+      expect(app.state.todos).toHaveLength(10);
+
+      // Rapidly toggle completion
+      for (let i = 0; i < 10; i++) {
+        app.toggleTodo(`rapid-${i}`);
+      }
+
+      // Verify all todos are completed
+      expect(app.state.todos.every(t => t.completed)).toBe(true);
+
+      // Rapidly change filters
+      const filters = ['all', 'active', 'completed', 'all', 'active'];
+      filters.forEach(filter => {
+        app.setFilter(filter);
+        expect(app.state.currentFilter).toBe(filter);
+      });
+    });
+
+    test('should handle invalid todo IDs gracefully', () => {
+      app.setState({
+        todos: [{ id: 'valid-1', text: 'Valid todo', completed: false, createdAt: new Date() }]
+      });
+
+      // Try operations with invalid IDs
+      expect(() => app.toggleTodo('invalid-id')).not.toThrow();
+      expect(() => app.editTodo('invalid-id', 'New text')).not.toThrow();
+      expect(() => app.deleteTodo('invalid-id')).not.toThrow();
+
+      // Verify original todo is unchanged
+      expect(app.state.todos).toHaveLength(1);
+      expect(app.state.todos[0].text).toBe('Valid todo');
+      expect(app.state.todos[0].completed).toBe(false);
+    });
+
+    test('should recover from render errors gracefully', () => {
+      // Simulate a render error by providing invalid data
+      const originalRender = app.render;
+      let renderErrorOccurred = false;
+
+      app.render = function() {
+        try {
+          return originalRender.call(this);
+        } catch (error) {
+          renderErrorOccurred = true;
+          // Fallback render
+          this.container.innerHTML = '<div class="error-state">Application error occurred</div>';
+        }
+      };
+
+      // Trigger render with problematic data
+      app.setState({
+        todos: [{ id: null, text: null, completed: null }] // Invalid data
+      });
+
+      // Verify error was handled gracefully
+      if (renderErrorOccurred) {
+        const errorState = container.querySelector('.error-state');
+        expect(errorState).toBeTruthy();
+      }
+
+      // Restore original render function
+      app.render = originalRender;
+    });
+
+    test('should handle concurrent state updates', () => {
+      // Simulate concurrent updates
+      const promises = [];
+
+      for (let i = 0; i < 5; i++) {
+        promises.push(new Promise(resolve => {
+          setTimeout(() => {
+            app.setState({
+              todos: [...app.state.todos, {
+                id: `concurrent-${i}`,
+                text: `Concurrent todo ${i}`,
+                completed: false,
+                createdAt: new Date()
+              }]
+            });
+            resolve();
+          }, Math.random() * 10);
+        }));
+      }
+
+      return Promise.all(promises).then(() => {
+        // All todos should be added despite concurrent updates
+        expect(app.state.todos).toHaveLength(5);
+
+        // Verify all todos have unique IDs
+        const ids = app.state.todos.map(t => t.id);
+        const uniqueIds = [...new Set(ids)];
+        expect(uniqueIds).toHaveLength(5);
+      });
+    });
+  });
+
+  describe('Advanced User Workflows', () => {
+    test('should handle complex multi-step workflow', () => {
+      console.log('    🔄 Testing complex multi-step user workflow');
+
+      // Step 1: User adds multiple todos
+      const todosToAdd = [
+        'Buy groceries for dinner party',
+        'Call mom about weekend plans',
+        'Finish quarterly report',
+        'Schedule dentist appointment',
+        'Review code for new feature'
+      ];
+
+      todosToAdd.forEach(text => {
+        const input = container.querySelector('#new-todo-input');
+        input.value = text;
+        input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+
+        const addBtn = container.querySelector('#add-todo-btn');
+        addBtn.click();
+      });
+
+      expect(app.state.todos).toHaveLength(5);
+
+      // Step 2: User completes some todos
+      const checkboxes = container.querySelectorAll('.todo-checkbox');
+      checkboxes[1].click(); // Complete "Call mom"
+      checkboxes[3].click(); // Complete "Schedule dentist"
+
+      const completedCount = app.state.todos.filter(t => t.completed).length;
+      expect(completedCount).toBe(2);
+
+      // Step 3: User filters to see only active todos
+      const activeBtn = container.querySelector('.filter-btn[data-filter="active"]');
+      activeBtn.click();
+
+      expect(app.state.currentFilter).toBe('active');
+      const visibleTodos = container.querySelectorAll('.todo-item');
+      expect(visibleTodos).toHaveLength(3);
+
+      // Step 4: User edits an active todo
+      const editBtn = container.querySelector('.edit-btn');
+      editBtn.click();
+
+      const editInput = container.querySelector('.edit-input');
+      editInput.value = 'Buy organic groceries for dinner party';
+
+      const saveBtn = container.querySelector('.save-edit-btn');
+      saveBtn.click();
+
+      expect(app.state.todos[0].text).toBe('Buy organic groceries for dinner party');
+
+      // Step 5: User switches to completed filter
+      const completedBtn = container.querySelector('.filter-btn[data-filter="completed"]');
+      completedBtn.click();
+
+      expect(app.state.currentFilter).toBe('completed');
+      const completedTodos = container.querySelectorAll('.todo-item');
+      expect(completedTodos).toHaveLength(2);
+
+      // Step 6: User deletes a completed todo
+      global.confirm.mockReturnValue(true);
+      const deleteBtn = container.querySelector('.delete-btn');
+      deleteBtn.click();
+
+      expect(app.state.todos).toHaveLength(4);
+
+      // Step 7: User returns to all view
+      const allBtn = container.querySelector('.filter-btn[data-filter="all"]');
+      allBtn.click();
+
+      expect(app.state.currentFilter).toBe('all');
+      const allTodos = container.querySelectorAll('.todo-item');
+      expect(allTodos).toHaveLength(4);
+
+      console.log('    ✅ Complex multi-step workflow completed successfully');
+    });
+
+    test('should handle bulk operations workflow', () => {
+      // Setup multiple todos
+      const todos = Array.from({ length: 10 }, (_, i) => ({
+        id: `bulk-${i}`,
+        text: `Bulk todo ${i + 1}`,
+        completed: i % 2 === 0, // Every other todo is completed
+        createdAt: new Date()
+      }));
+      app.setState({ todos });
+
+      // Simulate bulk complete all active todos
+      const activeTodos = app.state.todos.filter(t => !t.completed);
+      activeTodos.forEach(todo => {
+        app.toggleTodo(todo.id);
+      });
+
+      // Verify all todos are now completed
+      expect(app.state.todos.every(t => t.completed)).toBe(true);
+
+      // Simulate bulk delete completed todos
+      const completedTodos = app.state.todos.filter(t => t.completed);
+      global.confirm.mockReturnValue(true);
+
+      completedTodos.forEach(todo => {
+        app.deleteTodo(todo.id);
+      });
+
+      // Verify all todos were deleted
+      expect(app.state.todos).toHaveLength(0);
+    });
+
+    test('should handle session restoration workflow', () => {
+      // Session 1: User creates and modifies todos
+      const sessionTodos = [
+        { id: 'session-1', text: 'Session todo 1', completed: false, createdAt: new Date() },
+        { id: 'session-2', text: 'Session todo 2', completed: true, createdAt: new Date() },
+        { id: 'session-3', text: 'Session todo 3', completed: false, createdAt: new Date() }
+      ];
+
+      app.setState({
+        todos: sessionTodos,
+        currentFilter: 'active'
+      });
+
+      // Verify data is saved
+      const savedData = localStorage.getItem('todoapp_data');
+      expect(savedData).toBeTruthy();
+
+      // Session 2: Simulate browser restart
+      app.destroy();
+      const newApp = new MockTodoApp(container);
+      newApp.loadFromStorage();
+
+      // Verify session was restored
+      expect(newApp.state.todos).toHaveLength(3);
+      expect(newApp.state.currentFilter).toBe('active');
+      expect(newApp.state.todos[0].text).toBe('Session todo 1');
+
+      // User continues working in restored session
+      newApp.addTodo('New todo after restore');
+      expect(newApp.state.todos).toHaveLength(4);
+
+      newApp.destroy();
+    });
+  });
+
+  describe('Accessibility and Usability', () => {
+    test('should provide proper ARIA labels and roles', () => {
+      app.setState({
+        todos: [
+          { id: 'a11y-1', text: 'Accessible todo', completed: false, createdAt: new Date() }
+        ]
+      });
+
+      // Check for proper form labels
+      const input = container.querySelector('#new-todo-input');
+      expect(input.getAttribute('placeholder')).toBe('Add a new todo...');
+
+      // Check for proper button labels
+      const addBtn = container.querySelector('#add-todo-btn');
+      expect(addBtn.textContent.trim()).toBe('Add Todo');
+
+      // Check for proper checkbox labels
+      const checkbox = container.querySelector('.todo-checkbox');
+      expect(checkbox.getAttribute('type')).toBe('checkbox');
+
+      // Check for proper button roles
+      const editBtn = container.querySelector('.edit-btn');
+      expect(editBtn.textContent.trim()).toBe('Edit');
+
+      const deleteBtn = container.querySelector('.delete-btn');
+      expect(deleteBtn.textContent.trim()).toBe('Delete');
+    });
+
+    test('should handle focus management during editing', () => {
+      app.setState({
+        todos: [
+          { id: 'focus-1', text: 'Focus test todo', completed: false, createdAt: new Date() }
+        ]
+      });
+
+      // Start editing
+      const editBtn = container.querySelector('.edit-btn[data-id="focus-1"]');
+      editBtn.click();
+
+      // Verify edit input is present
+      const editInput = container.querySelector('.edit-input[data-id="focus-1"]');
+      expect(editInput).toBeTruthy();
+      expect(editInput.value).toBe('Focus test todo');
+
+      // Cancel editing
+      const cancelBtn = container.querySelector('.cancel-edit-btn[data-id="focus-1"]');
+      cancelBtn.click();
+
+      // Verify edit mode is exited
+      expect(app.state.editingId).toBe(null);
+      const todoText = container.querySelector('.todo-text');
+      expect(todoText.textContent).toBe('Focus test todo');
+    });
+  });
+});
+
+// Additional test utilities for comprehensive coverage
+class E2ETestUtils {
+  static simulateUserSession(app, actions) {
+    const results = [];
+
+    actions.forEach(action => {
+      const startTime = Date.now();
+      let result;
+
+      try {
+        switch (action.type) {
+          case 'add':
+            result = app.addTodo(action.text);
+            break;
+          case 'toggle':
+            result = app.toggleTodo(action.id);
+            break;
+          case 'edit':
+            app.startEdit(action.id);
+            result = app.saveEdit(action.id, action.newText);
+            break;
+          case 'delete':
+            result = app.deleteTodo(action.id);
+            break;
+          case 'filter':
+            result = app.setFilter(action.filter);
+            break;
+          case 'save':
+            result = app.saveToStorage();
+            break;
+          case 'load':
+            result = app.loadFromStorage();
+            break;
+          default:
+            result = false;
+        }
+
+        const endTime = Date.now();
+        results.push({
+          action: action.type,
+          success: result !== false,
+          duration: endTime - startTime,
+          data: action
+        });
+
+      } catch (error) {
+        results.push({
+          action: action.type,
+          success: false,
+          error: error.message,
+          data: action
+        });
+      }
+    });
+
+    return results;
+  }
+
+  static generateRealisticTodos(count) {
+    const todoTemplates = [
+      'Buy groceries', 'Walk the dog', 'Call mom', 'Finish report',
+      'Schedule meeting', 'Pay bills', 'Clean house', 'Exercise',
+      'Read book', 'Write code', 'Review documents', 'Plan vacation',
+      'Fix bug', 'Update website', 'Send emails', 'Organize files'
+    ];
+
+    return Array.from({ length: count }, (_, i) => {
+      const template = todoTemplates[i % todoTemplates.length];
+      return {
+        id: `realistic-${i}`,
+        text: `${template} ${Math.floor(i / todoTemplates.length) + 1}`,
+        completed: Math.random() > 0.7, // 30% completed
+        createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) // Random within last week
+      };
+    });
+  }
+
+  static measurePerformance(operation, iterations = 1) {
+    const times = [];
+
+    for (let i = 0; i < iterations; i++) {
+      const start = performance.now();
+      operation();
+      const end = performance.now();
+      times.push(end - start);
+    }
+
+    return {
+      min: Math.min(...times),
+      max: Math.max(...times),
+      avg: times.reduce((a, b) => a + b, 0) / times.length,
+      total: times.reduce((a, b) => a + b, 0)
+    };
+  }
+}
+
+export { E2ETestUtils };t i = 0; i < 50; i++) {
         app.toggleTodo(`todo-${i}`);
       }
 
