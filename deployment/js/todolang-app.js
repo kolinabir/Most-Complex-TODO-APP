@@ -1,1 +1,341 @@
-(function(window,document){'use strict';window.class TodoLangRuntime{constructor(options={}){this.options=options;this.modules=new Map();this.errorHandlers=[];this.performanceMetrics=[];}async initialize(config={}){this.modules=config.modules||new Map();this.mode=config.mode||'development';this.enableDebugging=config.enableDebugging||false;if(this.enableDebugging){console.log('🔧 TodoLang Runtime initialized in debug mode');}}async execute(compiledCode){try{if(this.enableDebugging){console.log('⚡ Executing compiled TodoLang code...');}if(typeof compiledCode==='string'&&compiledCode.includes('class')){return{success: true,type: 'class'};}return{success: true,type: 'unknown'};}catch(error){this.notifyErrorHandlers(error);throw error;}}async mount(element){if(typeof window!=='undefined'&&element){if(this.enableDebugging){console.log('🔗 Mounting TodoLang application to DOM element');}element.innerHTML='<div>TodoLang Runtime Placeholder-Application would be mounted here</div>';return true;}return false;}async hotReload(modulePath,newCode){if(this.enableDebugging){console.log(`🔥 Hot reloading module: ${modulePath}`);}if(this.modules.has(modulePath)){const module=this.modules.get(modulePath);module.compiledCode=newCode;module.lastReloaded=new Date();}return true;}onError(handler){this.errorHandlers.push(handler);}onPerformanceMetric(handler){this.performanceMetricHandlers=this.performanceMetricHandlers||[];this.performanceMetricHandlers.push(handler);}notifyErrorHandlers(error){for(const handler of this.errorHandlers){try{handler(error);}catch(handlerError){console.error('Error in error handler:',handlerError);}}}cleanup(){this.modules.clear();this.errorHandlers=[];this.performanceMetrics=[];if(this.enableDebugging){console.log('🧹 TodoLang Runtime cleaned up');}}}class ReactiveHandler{constructor(stateManager,path=''){this.stateManager=stateManager;this.path=path;}get(target,property,receiver){const value=Reflect.get(target,property,receiver);const fullPath=this.path ? `${this.path}.${property}` : property;this.stateManager._trackAccess(fullPath);if(value!==null&&typeof value==='object'){return new Proxy(value,new ReactiveHandler(this.stateManager,fullPath));}return value;}set(target,property,value,receiver){const oldValue=target[property];const fullPath=this.path ? `${this.path}.${property}` : property;const result=Reflect.set(target,property,value,receiver);if(oldValue!==value){this.stateManager._notifyChange(fullPath,value,oldValue);}return result;}deleteProperty(target,property){const oldValue=target[property];const fullPath=this.path ? `${this.path}.${property}` : property;const result=Reflect.deleteProperty(target,property);if(result){this.stateManager._notifyChange(fullPath,undefined,oldValue);}return result;}}class ReactiveState{constructor(initialState,stateManager){this._stateManager=stateManager;this._state=this._deepClone(initialState);this._proxy=new Proxy(this._state,new ReactiveHandler(stateManager));return this._proxy;}_deepClone(obj){if(obj===null||typeof obj!=='object')return obj;if(obj instanceof Date)return new Date(obj);if(obj instanceof Array)return obj.map(item=>this._deepClone(item));const cloned={};for(const key in obj){if(obj.hasOwnProperty(key)){cloned[key]=this._deepClone(obj[key]);}}return cloned;}}class TodoLangStateManager{constructor(){this._subscribers=new Map();this._globalSubscribers=new Set();this._currentlyTracking=null;this._dependencies=new Map();this._states=new Map();this._changeQueue=[];this._isProcessingChanges=false;}createState(initialState,stateId=null){const reactiveState=new ReactiveState(initialState,this);if(stateId){this._states.set(stateId,reactiveState);}return reactiveState;}subscribe(callback,paths=null){if(!paths){this._globalSubscribers.add(callback);return()=>this._globalSubscribers.delete(callback);}const pathArray=Array.isArray(paths)? paths : [paths];const unsubscribeFunctions=[];pathArray.forEach(path=>{if(!this._subscribers.has(path)){this._subscribers.set(path,new Set());}this._subscribers.get(path).add(callback);unsubscribeFunctions.push(()=>{const subscribers=this._subscribers.get(path);if(subscribers){subscribers.delete(callback);if(subscribers.size===0){this._subscribers.delete(path);}}});});return()=>unsubscribeFunctions.forEach(fn=>fn());}updateState(path,value){for(const [stateId,state] of this._states){if(this._setValueAtPath(state,path,value)){return;}}throw new Error(`Cannot update state at path: ${path}. State not found.`);}getState(path,stateId=null){if(stateId&&this._states.has(stateId)){return this._getValueAtPath(this._states.get(stateId),path);}for(const [id,state] of this._states){const value=this._getValueAtPath(state,path);if(value!==undefined){return value;}}return undefined;}startTracking(componentId){this._currentlyTracking=componentId;if(!this._dependencies.has(componentId)){this._dependencies.set(componentId,new Set());}else{this._dependencies.get(componentId).clear();}}stopTracking(){this._currentlyTracking=null;}clearDependencies(componentId){this._dependencies.delete(componentId);}_trackAccess(path){if(this._currentlyTracking){this._dependencies.get(this._currentlyTracking).add(path);}}_notifyChange(path,newValue,oldValue){const change={path,newValue,oldValue,timestamp: Date.now()};this._changeQueue.push(change);if(!this._isProcessingChanges){this._processChanges();}}_processChanges(){this._isProcessingChanges=true;Promise.resolve().then(()=>{const changes=[...this._changeQueue];this._changeQueue=[];changes.forEach(change=>{this._notifyPathSubscribers(change.path,change);});if(changes.length>0){this._globalSubscribers.forEach(callback=>{try{callback(changes);}catch(error){console.error('Error in global state subscriber:',error);}});}this._isProcessingChanges=false;if(this._changeQueue.length>0){this._processChanges();}});}_notifyPathSubscribers(path,change){const pathParts=path.split('.');for(let i=pathParts.length;i>0;i--){const currentPath=pathParts.slice(0,i).join('.');const subscribers=this._subscribers.get(currentPath);if(subscribers){subscribers.forEach(callback=>{try{callback(change,currentPath);}catch(error){console.error(`Error in state subscriber for path ${currentPath}:`,error);}});}}}_setValueAtPath(obj,path,value){const parts=path.split('.');let current=obj;try{for(let i=0;i<parts.length-1;i++){if(!(parts[i] in current)){current[parts[i]]={};}current=current[parts[i]];}current[parts[parts.length-1]]=value;return true;}catch(error){return false;}}_getValueAtPath(obj,path){const parts=path.split('.');let current=obj;try{for(const part of parts){if(current===null||current===undefined){return undefined;}current=current[part];}return current;}catch(error){return undefined;}}getDebugInfo(){return{subscriberCount: this._subscribers.size,globalSubscriberCount: this._globalSubscribers.size,stateCount: this._states.size,dependencyCount: this._dependencies.size,queuedChanges: this._changeQueue.length,isProcessingChanges: this._isProcessingChanges};}}TodoLangStateManager,ReactiveState,ReactiveHandler export*from './virtual-dom.js';export*from './component.js';class Route{constructor(path,handler,options={}){this.path=path;this.handler=handler;this.options=options;this.paramNames=[];this.regex=this._pathToRegex(path);}_pathToRegex(path){let regexPath=path.replace(/[.+*?^${}()|[\]\\]/g,'\\$&');regexPath=regexPath.replace(/:([^/]+)/g,(match,paramName)=>{this.paramNames.push(paramName);return '([^/]+)';});regexPath=regexPath.replace(/\\\*/g,'(.*)');return new RegExp(`^${regexPath}$`);}match(path){const match=this.regex.exec(path);if(!match)return null;const params={};this.paramNames.forEach((name,index)=>{params[name]=match[index+1];});return{route: this,params,path};}}class QueryParser{static parse(queryString){const params={};if(!queryString)return params;const cleanQuery=queryString.startsWith('?')? queryString.slice(1): queryString;if(!cleanQuery)return params;cleanQuery.split('&').forEach(pair=>{const [key,value]=pair.split('=').map(decodeURIComponent);if(key){params[key]=value||'';}});return params;}static stringify(params){if(!params||typeof params!=='object')return '';const pairs=[];for(const [key,value] of Object.entries(params)){if(value!==null&&value!==undefined){pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);}}return pairs.join('&');}}class HistoryManager{constructor(router){this.router=router;this._isNavigating=false;this._setupEventListeners();}_setupEventListeners(){if(typeof window==='undefined')return;window.addEventListener('popstate',(event)=>{if(!this._isNavigating){const path=window.location.pathname+window.location.search;this.router._handleRouteChange(path,false);}});window.addEventListener('hashchange',(event)=>{if(this.router.options.useHash){const hash=window.location.hash.slice(1)||'/';this.router._handleRouteChange(hash,false);}});}pushState(path,state={}){if(typeof window==='undefined')return;this._isNavigating=true;if(this.router.options.useHash){window.location.hash=path;}else{window.history.pushState(state,'',path);}this._isNavigating=false;}replaceState(path,state={}){if(typeof window==='undefined')return;this._isNavigating=true;if(this.router.options.useHash){window.location.replace(`${window.location.pathname}${window.location.search}#${path}`);}else{window.history.replaceState(state,'',path);}this._isNavigating=false;}back(){if(typeof window!=='undefined'){window.history.back();}}forward(){if(typeof window!=='undefined'){window.history.forward();}}go(delta){if(typeof window!=='undefined'){window.history.go(delta);}}}class TodoLangRouter{constructor(options={}){this.options={useHash: false,base: '',caseSensitive: false,...options};this.routes=[];this.currentRoute=null;this.currentParams={};this.currentQuery={};this.beforeHooks=[];this.afterHooks=[];this.errorHandlers=[];this.history=new HistoryManager(this);this._isStarted=false;}addRoute(path,handler,options={}){const route=new Route(path,handler,options);this.routes.push(route);return this;}addRoutes(routes){routes.forEach(({path,handler,options})=>{this.addRoute(path,handler,options);});return this;}navigate(path,options={}){const{replace=false,state={},trigger=true}=options;const normalizedPath=this._normalizePath(path);if(replace){this.history.replaceState(normalizedPath,state);}else{this.history.pushState(normalizedPath,state);}if(trigger){this._handleRouteChange(normalizedPath,true);}}replace(path,options={}){this.navigate(path,{...options,replace: true});}back(){this.history.back();}forward(){this.history.forward();}getCurrentRoute(){return{route: this.currentRoute,params:{...this.currentParams},query:{...this.currentQuery},path: this._getCurrentPath()};}_getCurrentPath(){if(typeof window==='undefined')return '/';if(this.options.useHash){return window.location.hash.slice(1)||'/';}else{return window.location.pathname+window.location.search;}}start(initialPath=null){if(this._isStarted){console.warn('Router is already started');return;}this._isStarted=true;const startPath=initialPath||this._getCurrentPath();this._handleRouteChange(startPath,false);}stop(){this._isStarted=false;}beforeEach(hook){this.beforeHooks.push(hook);}afterEach(hook){this.afterHooks.push(hook);}onError(handler){this.errorHandlers.push(handler);}async _handleRouteChange(path,isUserNavigation){if(!this._isStarted)return;try{const [pathname,queryString]=path.split('?');const normalizedPath=this._normalizePath(pathname);const query=QueryParser.parse(queryString);const matchResult=this._findMatchingRoute(normalizedPath);if(!matchResult){this._handleNotFound(normalizedPath);return;}const{route,params}=matchResult;const to={route,params,query,path: normalizedPath,fullPath: path};const from={route: this.currentRoute,params: this.currentParams,query: this.currentQuery,path: this.currentRoute ? this.currentRoute.path : null};const shouldContinue=await this._runBeforeHooks(to,from);if(!shouldContinue)return;this.currentRoute=route;this.currentParams=params;this.currentQuery=query;await this._executeRouteHandler(route,to,from);await this._runAfterHooks(to,from);}catch(error){this._handleError(error,path);}}_findMatchingRoute(path){for(const route of this.routes){const match=route.match(path);if(match){return match;}}return null;}async _executeRouteHandler(route,to,from){if(typeof route.handler==='function'){await route.handler(to,from);}else if(route.handler&&typeof route.handler.render==='function'){await route.handler.render(to,from);}}async _runBeforeHooks(to,from){for(const hook of this.beforeHooks){try{const result=await hook(to,from);if(result===false){return false;}}catch(error){this._handleError(error,to.fullPath);return false;}}return true;}async _runAfterHooks(to,from){for(const hook of this.afterHooks){try{await hook(to,from);}catch(error){this._handleError(error,to.fullPath);}}}_handleNotFound(path){const error=new Error(`Route not found: ${path}`);error.code='ROUTE_NOT_FOUND';error.path=path;this._handleError(error,path);}_handleError(error,path){console.error('Router error:',error);for(const handler of this.errorHandlers){try{handler(error,path);return;}catch(handlerError){console.error('Error in error handler:',handlerError);}}console.error(`Unhandled router error at ${path}:`,error);}_normalizePath(path){let normalized=path;if(this.options.base&&normalized.startsWith(this.options.base)){normalized=normalized.slice(this.options.base.length);}if(!normalized.startsWith('/')){normalized='/'+normalized;}if(!this.options.caseSensitive){normalized=normalized.toLowerCase();}return normalized;}buildUrl(path,query={}){let url=this._normalizePath(path);const queryString=QueryParser.stringify(query);if(queryString){url+='?'+queryString;}return url;}getDebugInfo(){return{isStarted: this._isStarted,routeCount: this.routes.length,currentRoute: this.currentRoute?.path,currentParams: this.currentParams,currentQuery: this.currentQuery,options: this.options};}}TodoLangRouter,Route,QueryParser,HistoryManager class StorageError extends Error{constructor(message,code,originalError=null,userMessage=null){super(message);this.name='StorageError';this.code=code;this.originalError=originalError;this.userMessage=userMessage||this._generateUserMessage(code);this.timestamp=new Date().toISOString();}_generateUserMessage(code){const userMessages={'QUOTA_EXCEEDED': 'Storage space is full. Please clear some data or try again later.','STORAGE_UNAVAILABLE': 'Data storage is not available. Your changes may not be saved.','SERIALIZATION_ERROR': 'Unable to save data due to formatting issues.','DESERIALIZATION_ERROR': 'Unable to load saved data. The data may be corrupted.','INVALID_KEY': 'Invalid data identifier provided.','STORAGE_FAILED': 'Failed to save data. Please try again.','REMOVAL_FAILED': 'Failed to delete data. Please try again.','CLEAR_FAILED': 'Failed to clear storage. Please try again.','NETWORK_ERROR': 'Network connection issue. Please check your connection.','PERMISSION_DENIED': 'Permission denied. Please check your browser settings.','TIMEOUT': 'Operation timed out. Please try again.'};return userMessages[code]||'An unexpected storage error occurred. Please try again.';}getUserMessage(){return this.userMessage;}getDebugInfo(){return{message: this.message,code: this.code,userMessage: this.userMessage,timestamp: this.timestamp,originalError: this.originalError ?{name: this.originalError.name,message: this.originalError.message,stack: this.originalError.stack}: null};}}class StorageService{constructor(options={}){this.isAvailable=this._checkAvailability();this.fallbackStorage=new Map();this.quotaWarningThreshold=options.quotaWarningThreshold||0.8;this.maxRetries=options.maxRetries||3;this.enableErrorReporting=options.enableErrorReporting!==false;this.userErrorCallback=options.onUserError||null;this.errorHistory=[];this.maxErrorHistory=50;}_checkAvailability(){try{const testKey='__storage_test__';localStorage.setItem(testKey,'test');localStorage.removeItem(testKey);return true;}catch(error){console.warn('localStorage is not available,falling back to in-memory storage:',error.message);return false;}}_serialize(data){try{return JSON.stringify(data);}catch(error){throw new StorageError('Failed to serialize data for storage','SERIALIZATION_ERROR',error);}}_deserialize(data){if(data===null||data===undefined){return null;}try{return JSON.parse(data);}catch(error){throw new StorageError('Failed to deserialize data from storage','DESERIALIZATION_ERROR',error);}}async getQuotaInfo(){if(!this.isAvailable){return{used: this.fallbackStorage.size,total: Infinity,available: Infinity,percentage: 0};}try{if('storage' in navigator&&'estimate' in navigator.storage){const estimate=await navigator.storage.estimate();return{used: estimate.usage||0,total: estimate.quota||0,available:(estimate.quota||0)-(estimate.usage||0),percentage: estimate.quota ?(estimate.usage/estimate.quota): 0};}}catch(error){console.warn('Could not get storage quota information:',error.message);}const used=this._estimateLocalStorageSize();const estimated_total=5*1024*1024;return{used,total: estimated_total,available: estimated_total-used,percentage: used/estimated_total};}_estimateLocalStorageSize(){let total=0;try{for(let key in localStorage){if(localStorage.hasOwnProperty(key)){total+=key.length+(localStorage[key]||'').length;}}}catch(error){console.warn('Could not estimate localStorage size:',error.message);}return total*2;}async _checkQuotaWarning(){const quotaInfo=await this.getQuotaInfo();if(quotaInfo.percentage>this.quotaWarningThreshold){console.warn(`Storage quota warning: ${Math.round(quotaInfo.percentage*100)}% used`);return true;}return false;}async setItem(key,value,options={}){const{retries=this.maxRetries,skipQuotaCheck=false}=options;if(!key||typeof key!=='string'){throw new StorageError('Invalid key provided','INVALID_KEY');}const serializedValue=this._serialize(value);if(!skipQuotaCheck&&serializedValue.length>1024){await this._checkQuotaWarning();}if(!this.isAvailable){this.fallbackStorage.set(key,serializedValue);return;}let lastError;for(let attempt=0;attempt<=retries;attempt++){try{localStorage.setItem(key,serializedValue);return;}catch(error){lastError=error;if(error.name==='QuotaExceededError'||error.code===22){if(attempt<retries){await this._performCleanup();continue;}throw new StorageError('Storage quota exceeded and cleanup failed','QUOTA_EXCEEDED',error);}break;}}throw new StorageError(`Failed to store item after ${retries+1}attempts`,'STORAGE_FAILED',lastError);}getItem(key,defaultValue=null){if(!key||typeof key!=='string'){throw new StorageError('Invalid key provided','INVALID_KEY');}try{let rawValue;if(this.isAvailable){rawValue=localStorage.getItem(key);}else{rawValue=this.fallbackStorage.get(key);}if(rawValue===null||rawValue===undefined){return defaultValue;}return this._deserialize(rawValue);}catch(error){if(error instanceof StorageError){throw error;}console.warn(`Failed to retrieve item '${key}':`,error.message);return defaultValue;}}removeItem(key){if(!key||typeof key!=='string'){throw new StorageError('Invalid key provided','INVALID_KEY');}try{if(this.isAvailable){localStorage.removeItem(key);}else{this.fallbackStorage.delete(key);}}catch(error){throw new StorageError(`Failed to remove item '${key}'`,'REMOVAL_FAILED',error);}}hasItem(key){if(!key||typeof key!=='string'){return false;}try{if(this.isAvailable){return localStorage.getItem(key)!==null;}else{return this.fallbackStorage.has(key);}}catch(error){console.warn(`Failed to check existence of '${key}':`,error.message);return false;}}getAllKeys(){try{if(this.isAvailable){const keys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key!==null){keys.push(key);}}return keys;}else{return Array.from(this.fallbackStorage.keys());}}catch(error){console.warn('Failed to get all keys:',error.message);return [];}}clear(){try{if(this.isAvailable){localStorage.clear();}else{this.fallbackStorage.clear();}}catch(error){throw new StorageError('Failed to clear storage','CLEAR_FAILED',error);}}async getStats(){const quotaInfo=await this.getQuotaInfo();const keys=this.getAllKeys();return{isAvailable: this.isAvailable,itemCount: keys.length,quota: quotaInfo,keys: keys};}async _performCleanup(){console.log('Performing storage cleanup...');const keysToClean=this.getAllKeys().filter(key=>key.startsWith('temp_')||key.startsWith('cache_')||key.includes('_expired_'));for(const key of keysToClean){try{this.removeItem(key);}catch(error){console.warn(`Failed to remove cleanup key '${key}':`,error.message);}}const timestampKeys=this.getAllKeys().filter(key=>key.includes('_timestamp_')).sort();const itemsToRemove=Math.min(5,Math.floor(timestampKeys.length*0.1));for(let i=0;i<itemsToRemove;i++){try{this.removeItem(timestampKeys[i]);}catch(error){console.warn(`Failed to remove old key '${timestampKeys[i]}':`,error.message);}}console.log(`Cleanup completed. Removed ${keysToClean.length+itemsToRemove}items.`);}async setMultiple(items){const results=[];for(const [key,value] of Object.entries(items)){try{await this.setItem(key,value);results.push({key,success: true});}catch(error){results.push({key,success: false,error: error.message});}}return results;}getMultiple(keys,defaultValue=null){const results={};for(const key of keys){try{results[key]=this.getItem(key,defaultValue);}catch(error){results[key]=defaultValue;console.warn(`Failed to get item '${key}':`,error.message);}}return results;}_handleStorageError(error,operation='storage operation'){this.errorHistory.push({error: error,operation: operation,timestamp: new Date().toISOString(),isAvailable: this.isAvailable});if(this.errorHistory.length>this.maxErrorHistory){this.errorHistory=this.errorHistory.slice(-this.maxErrorHistory);}if(this.enableErrorReporting){globalErrorReporter.reportRuntimeError(error,{component: 'StorageService',operation: operation,isAvailable: this.isAvailable,fallbackStorageSize: this.fallbackStorage.size});}if(this.userErrorCallback){try{this.userErrorCallback(error,operation);}catch(callbackError){console.error('Error in user error callback:',callbackError);}}return error;}getUserErrorMessage(error){if(error instanceof StorageError){return error.getUserMessage();}if(error.name==='QuotaExceededError'||error.code===22){return 'Storage space is full. Please clear some data or try again later.';}if(error.name==='SecurityError'){return 'Permission denied. Please check your browser settings.';}return 'An unexpected storage error occurred. Please try again.';}getErrorHistory(){return this.errorHistory.slice();}clearErrorHistory(){this.errorHistory=[];}getErrorStats(){const now=Date.now();const oneHourAgo=now-(60*60*1000);const oneDayAgo=now-(24*60*60*1000);const recentErrors=this.errorHistory.filter(entry=>new Date(entry.timestamp).getTime()>oneHourAgo);const dailyErrors=this.errorHistory.filter(entry=>new Date(entry.timestamp).getTime()>oneDayAgo);const errorTypes={};for(const entry of this.errorHistory){const type=entry.error.code||entry.error.name||'unknown';errorTypes[type]=(errorTypes[type]||0)+1;}return{total: this.errorHistory.length,recent: recentErrors.length,daily: dailyErrors.length,types: errorTypes,isAvailable: this.isAvailable,fallbackStorageSize: this.fallbackStorage.size};}async testStorage(){const testResults={isAvailable: this.isAvailable,canWrite: false,canRead: false,canDelete: false,quotaInfo: null,errors: []};const testKey='__storage_test_'+Date.now();const testValue={test: true,timestamp: Date.now()};try{await this.setItem(testKey,testValue);testResults.canWrite=true;const retrieved=this.getItem(testKey);testResults.canRead=retrieved&&retrieved.test===true;this.removeItem(testKey);testResults.canDelete=!this.hasItem(testKey);testResults.quotaInfo=await this.getQuotaInfo();}catch(error){testResults.errors.push({message: error.message,code: error.code,userMessage: this.getUserErrorMessage(error)});}return testResults;}async recoverFromError(errorType){switch(errorType){case 'QUOTA_EXCEEDED': await this._performCleanup();return 'Storage cleanup completed. Please try again.';case 'STORAGE_UNAVAILABLE': this.isAvailable=this._checkAvailability();return this.isAvailable ? 'Storage is now available.' : 'Storage is still unavailable. Using temporary storage.';case 'DESERIALIZATION_ERROR': return 'Data corruption detected. Some data may be lost.';default: return 'Recovery attempt completed. Please try again.';}}}const defaultRegistry=new ServiceRegistry();ServiceContainer,ServiceRegistry,defaultRegistry as registry window.const service=(name,constructor,options)=>defaultRegistry.service(name,constructor,options);window.const singleton=(name,constructor,dependencies)=>defaultRegistry.singleton(name,constructor,dependencies);window.const factory=(name,factory,dependencies)=>defaultRegistry.factory(name,factory,dependencies);window.const instance=(name,instance)=>defaultRegistry.instance(name,instance);window.const value=(name,value)=>defaultRegistry.value(name,value);window.const get=(name)=>defaultRegistry.get(name);window.const has=(name)=>defaultRegistry.has(name);window.const configure=(config)=>defaultRegistry.configure(config);window.const validate=()=>defaultRegistry.validate();window.const clear=()=>defaultRegistry.clear();class TodoApp{constructor(){this.todos=JSON.parse(localStorage.getItem('todos')||'[]');this.filter='all';this.editingId=null;}render(){const appElement=document.getElementById('app');if(!appElement)return;appElement.innerHTML=`<div class="todo-app"><h1>TodoLang Todo Application</h1><div class="todo-input-container"><input type="text" id="todo-input" class="todo-input" placeholder="What needs to be done?"/><button id="add-btn" class="add-btn">Add</button></div><div class="todo-list" id="todo-list">${this.renderTodos()}</div><div class="todo-filters"><button class="filter-btn ${this.filter==='all' ? 'active' : ''}" data-filter="all">All</button><button class="filter-btn ${this.filter==='active' ? 'active' : ''}" data-filter="active">Active</button><button class="filter-btn ${this.filter==='completed' ? 'active' : ''}" data-filter="completed">Completed</button></div><div class="todo-stats">${this.getActiveCount()}items left</div></div>`;this.attachEventListeners();}renderTodos(){const filteredTodos=this.getFilteredTodos();if(filteredTodos.length===0){return '<div class="empty-state">No todos found. Add one above!</div>';}return filteredTodos.map(todo=>`<div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}"><input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''}/><span class="todo-text">${this.escapeHtml(todo.text)}</span><div class="todo-actions"><button class="btn btn-edit">Edit</button><button class="btn btn-danger btn-delete">Delete</button></div></div>`).join('');}getFilteredTodos(){switch(this.filter){case 'active': return this.todos.filter(todo=>!todo.completed);case 'completed': return this.todos.filter(todo=>todo.completed);default: return this.todos;}}getActiveCount(){return this.todos.filter(todo=>!todo.completed).length;}addTodo(text){if(!text.trim())return;const todo={id: Date.now().toString(),text: text.trim(),completed: false,createdAt: new Date().toISOString()};this.todos.push(todo);this.saveTodos();this.render();}toggleTodo(id){const todo=this.todos.find(t=>t.id===id);if(todo){todo.completed=!todo.completed;this.saveTodos();this.render();}}deleteTodo(id){if(confirm('Are you sure you want to delete this todo?')){this.todos=this.todos.filter(t=>t.id!==id);this.saveTodos();this.render();}}setFilter(filter){this.filter=filter;this.updateURL();this.render();}updateURL(){const url=new URL(window.location);if(this.filter==='all'){url.searchParams.delete('filter');}else{url.searchParams.set('filter',this.filter);}window.history.replaceState({},'',url);}saveTodos(){try{localStorage.setItem('todos',JSON.stringify(this.todos));}catch(error){console.error('Failed to save todos:',error);}}escapeHtml(text){const div=document.createElement('div');div.textContent=text;return div.innerHTML;}attachEventListeners(){const input=document.getElementById('todo-input');const addBtn=document.getElementById('add-btn');const addTodo=()=>{this.addTodo(input.value);input.value='';};addBtn.addEventListener('click',addTodo);input.addEventListener('keypress',(e)=>{if(e.key==='Enter')addTodo();});document.addEventListener('click',(e)=>{const todoItem=e.target.closest('.todo-item');if(!todoItem)return;const id=todoItem.dataset.id;if(e.target.classList.contains('todo-checkbox')){this.toggleTodo(id);}else if(e.target.classList.contains('btn-delete')){this.deleteTodo(id);}else if(e.target.classList.contains('btn-edit')){this.editTodo(id);}});document.addEventListener('click',(e)=>{if(e.target.classList.contains('filter-btn')){this.setFilter(e.target.dataset.filter);}});}editTodo(id){const todo=this.todos.find(t=>t.id===id);if(!todo)return;const newText=prompt('Edit todo:',todo.text);if(newText!==null&&newText.trim()){todo.text=newText.trim();this.saveTodos();this.render();}}init(){const urlParams=new URLSearchParams(window.location.search);const filterParam=urlParams.get('filter');if(filterParam&&['all','active','completed'].includes(filterParam)){this.filter=filterParam;}this.render();}}window.TodoApp=TodoApp;function initializeTodoLangApp(){console.log('🚀 Initializing TodoLang Application...');try{const app=new TodoApp();app.init();console.log('✅ TodoLang Application initialized successfully');}catch(error){console.error('❌ Failed to initialize TodoLang Application:',error);const appElement=document.getElementById('app');if(appElement){appElement.innerHTML=`<div class="todo-app"><div class="error"><h1>Application Error</h1><p>Failed to initialize the TodoLang application. Please refresh the page.</p><details><summary>Error Details</summary><pre>${error.message}</pre></details></div></div>`;}}}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initializeTodoLangApp);}else{initializeTodoLangApp();}})(window,document);
+/*!
+ * TodoLang Todo Application v1.0.0
+ * Built: 2025-07-31T14:46:59.990Z
+ * An extremely over-engineered todo application built with a custom DSL
+ */
+
+(function(window, document) {
+  'use strict';
+
+  // Feature detection
+  const FEATURES = {
+    localStorage: typeof Storage !== 'undefined',
+    promises: typeof Promise !== 'undefined',
+    es6: (function() {
+      try { new Function('(a = 0) => a'); return true; } catch (e) { return false; }
+    })()
+  };
+
+  // Optimized Storage Service
+  class StorageService {
+    constructor() {
+      this.isAvailable = this._checkAvailability();
+      this.fallbackStorage = new Map();
+    }
+
+    _checkAvailability() {
+      try {
+        const testKey = '__storage_test__';
+        localStorage.setItem(testKey, 'test');
+        localStorage.removeItem(testKey);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    setItem(key, value) {
+      try {
+        const serializedValue = JSON.stringify(value);
+        if (this.isAvailable) {
+          localStorage.setItem(key, serializedValue);
+        } else {
+          this.fallbackStorage.set(key, serializedValue);
+        }
+      } catch (error) {
+        console.warn('Failed to save to storage:', error.message);
+      }
+    }
+
+    getItem(key, defaultValue = null) {
+      try {
+        let rawValue;
+        if (this.isAvailable) {
+          rawValue = localStorage.getItem(key);
+        } else {
+          rawValue = this.fallbackStorage.get(key);
+        }
+
+        if (rawValue === null || rawValue === undefined) {
+          return defaultValue;
+        }
+
+        return JSON.parse(rawValue);
+      } catch (error) {
+        console.warn('Failed to retrieve from storage:', error.message);
+        return defaultValue;
+      }
+    }
+
+    removeItem(key) {
+      try {
+        if (this.isAvailable) {
+          localStorage.removeItem(key);
+        } else {
+          this.fallbackStorage.delete(key);
+        }
+      } catch (error) {
+        console.warn('Failed to remove from storage:', error.message);
+      }
+    }
+  }
+
+  // Simple Router
+  class SimpleRouter {
+    constructor() {
+      this.currentFilter = 'all';
+      this._setupEventListeners();
+    }
+
+    _setupEventListeners() {
+      if (typeof window === 'undefined') return;
+
+      window.addEventListener('popstate', () => {
+        this._handleRouteChange();
+      });
+    }
+
+    navigate(filter) {
+      this.currentFilter = filter;
+      this._updateURL();
+    }
+
+    _updateURL() {
+      if (typeof window === 'undefined') return;
+
+      const url = new URL(window.location);
+      if (this.currentFilter === 'all') {
+        url.searchParams.delete('filter');
+      } else {
+        url.searchParams.set('filter', this.currentFilter);
+      }
+      window.history.replaceState({}, '', url);
+    }
+
+    _handleRouteChange() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const filterParam = urlParams.get('filter');
+      if (filterParam && ['all', 'active', 'completed'].includes(filterParam)) {
+        this.currentFilter = filterParam;
+      }
+    }
+
+    getCurrentFilter() {
+      return this.currentFilter;
+    }
+
+    init() {
+      this._handleRouteChange();
+    }
+  }
+
+  // Main TodoApp Class
+  class TodoApp {
+    constructor() {
+      this.storage = new StorageService();
+      this.router = new SimpleRouter();
+      this.todos = this.storage.getItem('todos', []);
+      this.filter = 'all';
+      this.editingId = null;
+    }
+
+    init() {
+      this.router.init();
+      this.filter = this.router.getCurrentFilter();
+      this.render();
+    }
+
+    render() {
+      const appElement = document.getElementById('app');
+      if (!appElement) return;
+
+      appElement.innerHTML = `
+        <div class="todo-app">
+          <h1>TodoLang Todo Application</h1>
+          <div class="todo-input-container">
+            <input type="text" id="todo-input" class="todo-input" placeholder="What needs to be done?" />
+            <button id="add-btn" class="add-btn">Add</button>
+          </div>
+          <div class="todo-list" id="todo-list">${this.renderTodos()}</div>
+          <div class="todo-filters">
+            <button class="filter-btn ${this.filter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+            <button class="filter-btn ${this.filter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
+            <button class="filter-btn ${this.filter === 'completed' ? 'active' : ''}" data-filter="completed">Completed</button>
+          </div>
+          <div class="todo-stats">${this.getActiveCount()} items left</div>
+        </div>
+      `;
+
+      this.attachEventListeners();
+    }
+
+    renderTodos() {
+      const filteredTodos = this.getFilteredTodos();
+
+      if (filteredTodos.length === 0) {
+        return '<div class="empty-state">No todos found. Add one above!</div>';
+      }
+
+      return filteredTodos.map(todo => `
+        <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+          <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''} />
+          <span class="todo-text">${this.escapeHtml(todo.text)}</span>
+          <div class="todo-actions">
+            <button class="btn btn-edit">Edit</button>
+            <button class="btn btn-danger btn-delete">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    getFilteredTodos() {
+      switch (this.filter) {
+        case 'active':
+          return this.todos.filter(todo => !todo.completed);
+        case 'completed':
+          return this.todos.filter(todo => todo.completed);
+        default:
+          return this.todos;
+      }
+    }
+
+    getActiveCount() {
+      return this.todos.filter(todo => !todo.completed).length;
+    }
+
+    addTodo(text) {
+      if (!text.trim()) return;
+
+      const todo = {
+        id: Date.now().toString(),
+        text: text.trim(),
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+
+      this.todos.push(todo);
+      this.saveTodos();
+      this.render();
+    }
+
+    toggleTodo(id) {
+      const todo = this.todos.find(t => t.id === id);
+      if (todo) {
+        todo.completed = !todo.completed;
+        this.saveTodos();
+        this.render();
+      }
+    }
+
+    deleteTodo(id) {
+      if (confirm('Are you sure you want to delete this todo?')) {
+        this.todos = this.todos.filter(t => t.id !== id);
+        this.saveTodos();
+        this.render();
+      }
+    }
+
+    editTodo(id) {
+      const todo = this.todos.find(t => t.id === id);
+      if (!todo) return;
+
+      const newText = prompt('Edit todo:', todo.text);
+      if (newText !== null && newText.trim()) {
+        todo.text = newText.trim();
+        this.saveTodos();
+        this.render();
+      }
+    }
+
+    setFilter(filter) {
+      this.filter = filter;
+      this.router.navigate(filter);
+      this.render();
+    }
+
+    saveTodos() {
+      this.storage.setItem('todos', this.todos);
+    }
+
+    escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    attachEventListeners() {
+      const input = document.getElementById('todo-input');
+      const addBtn = document.getElementById('add-btn');
+
+      const addTodo = () => {
+        this.addTodo(input.value);
+        input.value = '';
+      };
+
+      if (addBtn) addBtn.addEventListener('click', addTodo);
+      if (input) {
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') addTodo();
+        });
+      }
+
+      // Event delegation for todo items and filters
+      document.addEventListener('click', (e) => {
+        const todoItem = e.target.closest('.todo-item');
+        if (todoItem) {
+          const id = todoItem.dataset.id;
+          if (e.target.classList.contains('todo-checkbox')) {
+            this.toggleTodo(id);
+          } else if (e.target.classList.contains('btn-delete')) {
+            this.deleteTodo(id);
+          } else if (e.target.classList.contains('btn-edit')) {
+            this.editTodo(id);
+          }
+        }
+
+        if (e.target.classList.contains('filter-btn')) {
+          this.setFilter(e.target.dataset.filter);
+        }
+      });
+    }
+  }
+
+  // Global exports
+  window.TodoApp = TodoApp;
+  window.FEATURES = FEATURES;
+
+  // Auto-initialization
+  function initializeTodoLangApp() {
+    try {
+      const app = new TodoApp();
+      app.init();
+      console.log('✅ TodoLang Application initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize TodoLang Application:', error);
+
+      const appElement = document.getElementById('app');
+      if (appElement) {
+        appElement.innerHTML = `
+          <div class="todo-app">
+            <div class="error">
+              <h1>Application Error</h1>
+              <p>Failed to initialize the TodoLang application. Please refresh the page.</p>
+              <details>
+                <summary>Error Details</summary>
+                <pre>${error.message}</pre>
+              </details>
+            </div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeTodoLangApp);
+  } else {
+    initializeTodoLangApp();
+  }
+
+})(window, document);

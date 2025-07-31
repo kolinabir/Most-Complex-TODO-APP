@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-07-31T14:51:26.555Z",
+  "status": "PASSED",
+  "errors": [],
+  "warnings": [
+    "DEPLOYMENT.md missing required sections"
+  ],
+  "statistics": {
+    "totalFiles": 11,
+    "totalSize": 44798,
+    "jsSize": 9335,
+    "htmlSize": 8081,
+    "docsSize": 20003
+  },
+  "summary": {
+    "totalFiles": 11,
+    "totalSize": "43.75 KB",
+    "jsSize": "9.12 KB",
+    "htmlSize": "7.89 KB",
+    "docsSize": "19.53 KB",
+    "errorCount": 0,
+    "warningCount": 1
+  }
+}

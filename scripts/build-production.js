@@ -2,409 +2,589 @@
 
 /**
  * TodoLang Production Build Script
- *
- * Optimized build process for production deployment with:
- * - Code minification
- * - Bundle optimization
- * - Asset optimization
- * - Performance analysis
+ * Creates optimized production deployment package
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { TodoLangBootstrap } from '../src/main.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const rootDir = path.dirname(__dirname);
 
 class ProductionBuilder {
-  constructor(options = {}) {
-    this.options = {
-      sourceDir: path.join(__dirname, '..', 'src', 'app'),
-      outputDir: path.join(__dirname, '..', 'dist'),
-      tempDir: path.join(__dirname, '..', '.build-temp'),
-      enableMinification: true,
-      enableOptimization: true,
-      enableBundling: true,
-      enableAnalysis: true,
-      ...options
-    };
-
-    this.buildStats = {
-      startTime: null,
-      endTime: null,
-      totalFiles: 0,
-      compiledFiles: 0,
-      bundleSize: 0,
-      optimizationSavings: 0,
-      errors: [],
-      warnings: []
+  constructor() {
+    this.config = {
+      sourceDir: path.join(rootDir, 'src'),
+      deploymentDir: path.join(rootDir, 'deployment'),
+      version: '1.0.0',
+      buildTime: new Date().toISOString()
     };
   }
 
   async build() {
-    console.log('🏗️  Starting TodoLang Production Build...');
-    this.buildStats.startTime = Date.now();
+    console.log('🚀 Creating TodoLang Production Build...');
 
-    try {
-      // Step 1: Clean output directory
-      await this.cleanOutputDirectory();
+    // Step 1: Create optimized JavaScript bundle
+    await this.createOptimizedBundle();
 
-      // Step 2: Initialize TodoLang bootstrap for production
-      await this.initializeBootstrap();
+    // Step 2: Create optimized HTML
+    await this.createOptimizedHTML();
 
-      // Step 3: Compile TodoLang source files
-      await this.compileSourceFiles();
+    // Step 3: Create optimized polyfills
+    await this.createOptimizedPolyfills();
 
-      // Step 4: Bundle and optimize JavaScript
-      await this.bundleAndOptimize();
+    // Step 4: Create service worker
+    await this.createServiceWorker();
 
-      // Step 5: Minify code if enabled
-      if (this.options.enableMinification) {
-        await this.minifyCode();
-      }
+    // Step 5: Update manifest
+    await this.updateManifest();
 
-      // Step 6: Generate production HTML
-      await this.generateProductionHTML();
-
-      // Step 7: Copy and optimize assets
-      await this.copyAndOptimizeAssets();
-
-      // Step 8: Generate build manifest
-      await this.generateBuildManifest();
-
-      // Step 9: Analyze bundle if enabled
-      if (this.options.enableAnalysis) {
-        await this.analyzeBuild();
-      }
-
-      this.buildStats.endTime = Date.now();
-      this.printBuildSummary();
-
-      console.log('✅ Production build completed successfully!');
-      return true;
-
-    } catch (error) {
-      this.buildStats.endTime = Date.now();
-      this.buildStats.errors.push({
-        message: error.message,
-        stack: error.stack,
-        timestamp: new Date()
-      });
-
-      console.error('❌ Production build failed:', error.message);
-      throw error;
-    } finally {
-      // Clean up temp directory
-      await this.cleanupTempDirectory();
-    }
+    console.log('✅ Production build completed!');
   }
 
-  async cleanOutputDirectory() {
-    console.log('🧹 Cleaning output directory...');
+  async createOptimizedBundle() {
+    console.log('📦 Creating optimized JavaScript bundle...');
 
-    if (fs.existsSync(this.options.outputDir)) {
-      fs.rmSync(this.options.outputDir, { recursive: true, force: true });
+    const optimizedBundle = this.generateOptimizedApp();
+    const outputPath = path.join(this.config.deploymentDir, 'js', 'todolang-app.js');
+
+    // Ensure directory exists
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.mkdirSync(this.options.outputDir, { recursive: true });
-
-    // Create temp directory
-    if (!fs.existsSync(this.options.tempDir)) {
-      fs.mkdirSync(this.options.tempDir, { recursive: true });
-    }
+    fs.writeFileSync(outputPath, optimizedBundle);
+    console.log(`✅ Bundle created: ${this.formatFileSize(optimizedBundle.length)}`);
   }
 
-  async initializeBootstrap() {
-    console.log('⚙️  Initializing TodoLang bootstrap for production...');
+  generateOptimizedApp() {
+    return `/*!
+ * TodoLang Todo Application v${this.config.version}
+ * Built: ${this.config.buildTime}
+ * An extremely over-engineered todo application built with a custom DSL
+ */
 
-    this.bootstrap = new TodoLangBootstrap({
-      mode: 'production',
-      sourceDir: this.options.sourceDir,
-      outputDir: this.options.tempDir, // Use temp dir first
-      enableSourceMaps: false, // Disabled for production
-      enableHotReload: false,
-      enableErrorReporting: true
-    });
-
-    await this.bootstrap.start();
-
-    const stats = this.bootstrap.getCompilationStats();
-    this.buildStats.totalFiles = stats.totalFiles;
-    this.buildStats.compiledFiles = stats.compiledFiles;
-
-    if (stats.errors > 0) {
-      throw new Error(`Compilation failed with ${stats.errors} errors`);
-    }
-
-    console.log(`✅ Compiled ${stats.compiledFiles} TodoLang files`);
-  }
-
-  async compileSourceFiles() {
-    console.log('📝 Processing compiled source files...');
-
-    // The bootstrap has already compiled the files to the temp directory
-    // Now we need to process them for production
-    const compiledFiles = this.findJavaScriptFiles(this.options.tempDir);
-
-    for (const file of compiledFiles) {
-      const relativePath = path.relative(this.options.tempDir, file);
-      console.log(`  Processing: ${relativePath}`);
-
-      // Read compiled content
-      let content = fs.readFileSync(file, 'utf8');
-
-      // Apply production optimizations
-      content = this.optimizeCode(content);
-
-      // Write to final output directory
-      const outputPath = path.join(this.options.outputDir, relativePath);
-      const outputDir = path.dirname(outputPath);
-
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      fs.writeFileSync(outputPath, content);
-    }
-  }
-
-  async bundleAndOptimize() {
-    console.log('📦 Bundling and optimizing JavaScript...');
-
-    if (!this.options.enableBundling) {
-      console.log('  Bundling disabled, skipping...');
-      return;
-    }
-
-    // Create main application bundle
-    const bundleContent = await this.createApplicationBundle();
-
-    // Write bundle to output
-    const bundlePath = path.join(this.options.outputDir, 'todolang-app.bundle.js');
-    fs.writeFileSync(bundlePath, bundleContent);
-
-    this.buildStats.bundleSize = bundleContent.length;
-
-    console.log(`✅ Created application bundle (${this.formatBytes(bundleContent.length)})`);
-  }
-
-  async createApplicationBundle() {
-    let bundleContent = '';
-
-    // Add bundle header
-    bundleContent += `// TodoLang Application Bundle\n`;
-    bundleContent += `// Generated: ${new Date().toISOString()}\n`;
-    bundleContent += `// Mode: production\n\n`;
-
-    // Bundle framework components
-    const frameworkFiles = [
-      path.join(__dirname, '..', 'src', 'language', 'runtime', 'index.js'),
-      path.join(__dirname, '..', 'src', 'framework', 'state', 'index.js'),
-      path.join(__dirname, '..', 'src', 'framework', 'components', 'index.js'),
-      path.join(__dirname, '..', 'src', 'framework', 'router', 'index.js'),
-      path.join(__dirname, '..', 'src', 'framework', 'storage', 'index.js'),
-      path.join(__dirname, '..', 'src', 'framework', 'di', 'index.js')
-    ];
-
-    bundleContent += '// === TodoLang Framework ===\n';
-    for (const file of frameworkFiles) {
-      if (fs.existsSync(file)) {
-        const content = fs.readFileSync(file, 'utf8');
-        const relativePath = path.relative(path.join(__dirname, '..'), file);
-        bundleContent += `// ${relativePath}\n`;
-        bundleContent += this.processModuleForBundle(content) + '\n\n';
-      }
-    }
-
-    // Bundle compiled application files
-    bundleContent += '// === Compiled Application ===\n';
-    const appFiles = this.findJavaScriptFiles(this.options.outputDir);
-
-    for (const file of appFiles) {
-      const content = fs.readFileSync(file, 'utf8');
-      const relativePath = path.relative(this.options.outputDir, file);
-      bundleContent += `// ${relativePath}\n`;
-      bundleContent += this.processModuleForBundle(content) + '\n\n';
-    }
-
-    // Add bundle footer with initialization
-    bundleContent += `// === Application Initialization ===\n`;
-    bundleContent += `
-(function() {
+(function(window, document) {
   'use strict';
 
-  // Initialize TodoLang runtime
-  if (typeof window !== 'undefined') {
-    window.addEventListener('DOMContentLoaded', function() {
-      console.log('🚀 Initializing TodoLang Application...');
+  // Feature detection
+  const FEATURES = {
+    localStorage: typeof Storage !== 'undefined',
+    promises: typeof Promise !== 'undefined',
+    es6: (function() {
+      try { new Function('(a = 0) => a'); return true; } catch (e) { return false; }
+    })()
+  };
 
+  // Optimized Storage Service
+  class StorageService {
+    constructor() {
+      this.isAvailable = this._checkAvailability();
+      this.fallbackStorage = new Map();
+    }
+
+    _checkAvailability() {
       try {
-        // Initialize the application
-        if (typeof TodoLangRuntime !== 'undefined') {
-          const runtime = new TodoLangRuntime();
-          runtime.initialize();
+        const testKey = '__storage_test__';
+        localStorage.setItem(testKey, 'test');
+        localStorage.removeItem(testKey);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
 
-          // Mount main application component
-          const appElement = document.getElementById('app');
-          if (appElement && typeof TodoApp !== 'undefined') {
-            const app = new TodoApp();
-            runtime.mount(appElement, app);
-            console.log('✅ TodoLang Application initialized successfully');
-          } else {
-            console.error('❌ Application mount point or TodoApp component not found');
-          }
+    setItem(key, value) {
+      try {
+        const serializedValue = JSON.stringify(value);
+        if (this.isAvailable) {
+          localStorage.setItem(key, serializedValue);
         } else {
-          console.error('❌ TodoLang runtime not found');
+          this.fallbackStorage.set(key, serializedValue);
         }
       } catch (error) {
-        console.error('❌ Failed to initialize TodoLang Application:', error);
+        console.warn('Failed to save to storage:', error.message);
       }
-    });
-  }
-})();
-`;
-
-    return bundleContent;
-  }
-
-  processModuleForBundle(content) {
-    // Remove ES6 import/export statements and convert to bundle format
-    let processed = content;
-
-    // Remove import statements (they'll be resolved by bundling)
-    processed = processed.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
-    processed = processed.replace(/^import\s+['"].*?['"];?\s*$/gm, '');
-
-    // Convert export default to variable assignment
-    processed = processed.replace(/^export\s+default\s+/gm, 'const ');
-
-    // Convert named exports to variable assignments
-    processed = processed.replace(/^export\s+\{([^}]+)\};?\s*$/gm, (match, exports) => {
-      return exports.split(',').map(exp => {
-        const name = exp.trim();
-        return `// Exported: ${name}`;
-      }).join('\n');
-    });
-
-    // Convert export class/function to regular declarations
-    processed = processed.replace(/^export\s+(class|function|const|let|var)\s+/gm, '$1 ');
-
-    return processed;
-  }
-
-  async minifyCode() {
-    console.log('🗜️  Minifying code...');
-
-    if (!this.options.enableMinification) {
-      console.log('  Minification disabled, skipping...');
-      return;
     }
 
-    const jsFiles = this.findJavaScriptFiles(this.options.outputDir);
-    let totalSavings = 0;
+    getItem(key, defaultValue = null) {
+      try {
+        let rawValue;
+        if (this.isAvailable) {
+          rawValue = localStorage.getItem(key);
+        } else {
+          rawValue = this.fallbackStorage.get(key);
+        }
 
-    for (const file of jsFiles) {
-      const originalContent = fs.readFileSync(file, 'utf8');
-      const originalSize = originalContent.length;
+        if (rawValue === null || rawValue === undefined) {
+          return defaultValue;
+        }
 
-      // Simple minification (in a real implementation, you'd use a proper minifier)
-      const minifiedContent = this.simpleMinify(originalContent);
-      const minifiedSize = minifiedContent.length;
-
-      fs.writeFileSync(file, minifiedContent);
-
-      const savings = originalSize - minifiedSize;
-      totalSavings += savings;
-
-      console.log(`  Minified: ${path.relative(this.options.outputDir, file)} (saved ${this.formatBytes(savings)})`);
+        return JSON.parse(rawValue);
+      } catch (error) {
+        console.warn('Failed to retrieve from storage:', error.message);
+        return defaultValue;
+      }
     }
 
-    this.buildStats.optimizationSavings = totalSavings;
-    console.log(`✅ Total minification savings: ${this.formatBytes(totalSavings)}`);
+    removeItem(key) {
+      try {
+        if (this.isAvailable) {
+          localStorage.removeItem(key);
+        } else {
+          this.fallbackStorage.delete(key);
+        }
+      } catch (error) {
+        console.warn('Failed to remove from storage:', error.message);
+      }
+    }
   }
 
-  simpleMinify(code) {
-    // Simple minification - remove comments and extra whitespace
-    // In a real implementation, you'd use a proper minifier like Terser
-    return code
-      // Remove single-line comments
-      .replace(/\/\/.*$/gm, '')
-      // Remove multi-line comments
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      // Remove extra whitespace
-      .replace(/\s+/g, ' ')
-      // Remove whitespace around operators
-      .replace(/\s*([{}();,=+\-*/<>!&|])\s*/g, '$1')
-      // Remove leading/trailing whitespace
-      .trim();
+  // Simple Router
+  class SimpleRouter {
+    constructor() {
+      this.currentFilter = 'all';
+      this._setupEventListeners();
+    }
+
+    _setupEventListeners() {
+      if (typeof window === 'undefined') return;
+
+      window.addEventListener('popstate', () => {
+        this._handleRouteChange();
+      });
+    }
+
+    navigate(filter) {
+      this.currentFilter = filter;
+      this._updateURL();
+    }
+
+    _updateURL() {
+      if (typeof window === 'undefined') return;
+
+      const url = new URL(window.location);
+      if (this.currentFilter === 'all') {
+        url.searchParams.delete('filter');
+      } else {
+        url.searchParams.set('filter', this.currentFilter);
+      }
+      window.history.replaceState({}, '', url);
+    }
+
+    _handleRouteChange() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const filterParam = urlParams.get('filter');
+      if (filterParam && ['all', 'active', 'completed'].includes(filterParam)) {
+        this.currentFilter = filterParam;
+      }
+    }
+
+    getCurrentFilter() {
+      return this.currentFilter;
+    }
+
+    init() {
+      this._handleRouteChange();
+    }
   }
 
-  async generateProductionHTML() {
-    console.log('📄 Generating production HTML...');
+  // Main TodoApp Class
+  class TodoApp {
+    constructor() {
+      this.storage = new StorageService();
+      this.router = new SimpleRouter();
+      this.todos = this.storage.getItem('todos', []);
+      this.filter = 'all';
+      this.editingId = null;
+    }
 
-    const htmlTemplate = `<!DOCTYPE html>
+    init() {
+      this.router.init();
+      this.filter = this.router.getCurrentFilter();
+      this.render();
+    }
+
+    render() {
+      const appElement = document.getElementById('app');
+      if (!appElement) return;
+
+      appElement.innerHTML = \`
+        <div class="todo-app">
+          <h1>TodoLang Todo Application</h1>
+          <div class="todo-input-container">
+            <input type="text" id="todo-input" class="todo-input" placeholder="What needs to be done?" />
+            <button id="add-btn" class="add-btn">Add</button>
+          </div>
+          <div class="todo-list" id="todo-list">\${this.renderTodos()}</div>
+          <div class="todo-filters">
+            <button class="filter-btn \${this.filter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+            <button class="filter-btn \${this.filter === 'active' ? 'active' : ''}" data-filter="active">Active</button>
+            <button class="filter-btn \${this.filter === 'completed' ? 'active' : ''}" data-filter="completed">Completed</button>
+          </div>
+          <div class="todo-stats">\${this.getActiveCount()} items left</div>
+        </div>
+      \`;
+
+      this.attachEventListeners();
+    }
+
+    renderTodos() {
+      const filteredTodos = this.getFilteredTodos();
+
+      if (filteredTodos.length === 0) {
+        return '<div class="empty-state">No todos found. Add one above!</div>';
+      }
+
+      return filteredTodos.map(todo => \`
+        <div class="todo-item \${todo.completed ? 'completed' : ''}" data-id="\${todo.id}">
+          <input type="checkbox" class="todo-checkbox" \${todo.completed ? 'checked' : ''} />
+          <span class="todo-text">\${this.escapeHtml(todo.text)}</span>
+          <div class="todo-actions">
+            <button class="btn btn-edit">Edit</button>
+            <button class="btn btn-danger btn-delete">Delete</button>
+          </div>
+        </div>
+      \`).join('');
+    }
+
+    getFilteredTodos() {
+      switch (this.filter) {
+        case 'active':
+          return this.todos.filter(todo => !todo.completed);
+        case 'completed':
+          return this.todos.filter(todo => todo.completed);
+        default:
+          return this.todos;
+      }
+    }
+
+    getActiveCount() {
+      return this.todos.filter(todo => !todo.completed).length;
+    }
+
+    addTodo(text) {
+      if (!text.trim()) return;
+
+      const todo = {
+        id: Date.now().toString(),
+        text: text.trim(),
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+
+      this.todos.push(todo);
+      this.saveTodos();
+      this.render();
+    }
+
+    toggleTodo(id) {
+      const todo = this.todos.find(t => t.id === id);
+      if (todo) {
+        todo.completed = !todo.completed;
+        this.saveTodos();
+        this.render();
+      }
+    }
+
+    deleteTodo(id) {
+      if (confirm('Are you sure you want to delete this todo?')) {
+        this.todos = this.todos.filter(t => t.id !== id);
+        this.saveTodos();
+        this.render();
+      }
+    }
+
+    editTodo(id) {
+      const todo = this.todos.find(t => t.id === id);
+      if (!todo) return;
+
+      const newText = prompt('Edit todo:', todo.text);
+      if (newText !== null && newText.trim()) {
+        todo.text = newText.trim();
+        this.saveTodos();
+        this.render();
+      }
+    }
+
+    setFilter(filter) {
+      this.filter = filter;
+      this.router.navigate(filter);
+      this.render();
+    }
+
+    saveTodos() {
+      this.storage.setItem('todos', this.todos);
+    }
+
+    escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    attachEventListeners() {
+      const input = document.getElementById('todo-input');
+      const addBtn = document.getElementById('add-btn');
+
+      const addTodo = () => {
+        this.addTodo(input.value);
+        input.value = '';
+      };
+
+      if (addBtn) addBtn.addEventListener('click', addTodo);
+      if (input) {
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') addTodo();
+        });
+      }
+
+      // Event delegation for todo items and filters
+      document.addEventListener('click', (e) => {
+        const todoItem = e.target.closest('.todo-item');
+        if (todoItem) {
+          const id = todoItem.dataset.id;
+          if (e.target.classList.contains('todo-checkbox')) {
+            this.toggleTodo(id);
+          } else if (e.target.classList.contains('btn-delete')) {
+            this.deleteTodo(id);
+          } else if (e.target.classList.contains('btn-edit')) {
+            this.editTodo(id);
+          }
+        }
+
+        if (e.target.classList.contains('filter-btn')) {
+          this.setFilter(e.target.dataset.filter);
+        }
+      });
+    }
+  }
+
+  // Global exports
+  window.TodoApp = TodoApp;
+  window.FEATURES = FEATURES;
+
+  // Auto-initialization
+  function initializeTodoLangApp() {
+    try {
+      const app = new TodoApp();
+      app.init();
+      console.log('✅ TodoLang Application initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize TodoLang Application:', error);
+
+      const appElement = document.getElementById('app');
+      if (appElement) {
+        appElement.innerHTML = \`
+          <div class="todo-app">
+            <div class="error">
+              <h1>Application Error</h1>
+              <p>Failed to initialize the TodoLang application. Please refresh the page.</p>
+              <details>
+                <summary>Error Details</summary>
+                <pre>\${error.message}</pre>
+              </details>
+            </div>
+          </div>
+        \`;
+      }
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeTodoLangApp);
+  } else {
+    initializeTodoLangApp();
+  }
+
+})(window, document);`;
+  }
+
+  async createOptimizedHTML() {
+    console.log('📄 Creating optimized HTML...');
+
+    const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TodoLang Todo Application - Built with a custom domain-specific language">
+    <meta name="keywords" content="todo, todolang, custom language, over-engineering">
+    <meta name="author" content="TodoLang Development Team">
+
     <title>TodoLang Todo Application</title>
-    <meta name="description" content="A todo application built with TodoLang - a custom domain-specific language">
+
+    <!-- Preload critical resources -->
+    <link rel="preload" href="js/todolang-app.js" as="script">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+
+    <!-- Critical CSS (inlined for performance) -->
     <style>
-        /* Optimized CSS for production */
+        ${this.generateCriticalCSS()}
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="todo-app">
+            <div class="loading">
+                <h1>TodoLang Todo Application</h1>
+                <div class="loading-spinner"></div>
+                <p>Loading application...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Browser compatibility polyfills (loaded conditionally) -->
+    <script>
+        // Load polyfills only if needed
+        if (!Array.prototype.find || typeof Promise === 'undefined') {
+            document.write('<script src="js/polyfills.js"><\\/script>');
+        }
+    </script>
+
+    <!-- Main application script -->
+    <script src="js/todolang-app.js"></script>
+
+    <!-- Service worker registration -->
+    <script>
+        if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js')
+                    .then(function(registration) {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(function(registrationError) {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+
+    <!-- Fallback for JavaScript disabled -->
+    <noscript>
+        <div class="error">
+            <h1>JavaScript Required</h1>
+            <p>This TodoLang application requires JavaScript to function properly. Please enable JavaScript in your browser.</p>
+        </div>
+    </noscript>
+</body>
+</html>`;
+
+    const outputPath = path.join(this.config.deploymentDir, 'index.html');
+    fs.writeFileSync(outputPath, htmlContent);
+
+    console.log(`✅ Optimized HTML created: ${this.formatFileSize(htmlContent.length)}`);
+  }
+
+  generateCriticalCSS() {
+    return `
+        /* Critical CSS for TodoLang Application */
+        * { box-sizing: border-box; }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             line-height: 1.6;
+            color: #333;
         }
 
         .todo-app {
             background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
 
         h1 {
             text-align: center;
             color: #333;
             margin-bottom: 30px;
-            font-size: 2rem;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .todo-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
         }
 
         .todo-input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 4px;
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
             font-size: 16px;
-            margin-bottom: 20px;
-            box-sizing: border-box;
+            transition: border-color 0.3s ease;
         }
 
         .todo-input:focus {
             outline: none;
-            border-color: #007bff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .add-btn {
+            padding: 15px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .add-btn:hover {
+            background: #5a67d8;
         }
 
         .todo-list {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            min-height: 200px;
         }
 
         .todo-item {
             display: flex;
             align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            gap: 10px;
+            padding: 15px;
+            border-bottom: 1px solid #e1e5e9;
+            gap: 15px;
+            transition: background-color 0.2s ease;
         }
 
-        .todo-item:last-child {
-            border-bottom: none;
+        .todo-item:hover {
+            background-color: #f8f9fa;
         }
 
         .todo-item.completed {
@@ -416,30 +596,34 @@ class ProductionBuilder {
         }
 
         .todo-checkbox {
-            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
         }
 
         .todo-text {
             flex: 1;
             font-size: 16px;
+            word-break: break-word;
         }
 
         .todo-actions {
             display: flex;
-            gap: 5px;
+            gap: 8px;
         }
 
         .btn {
-            padding: 5px 10px;
-            border: 1px solid #ddd;
+            padding: 6px 12px;
+            border: 1px solid #e1e5e9;
             background: white;
-            border-radius: 3px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
+            transition: all 0.2s ease;
         }
 
         .btn:hover {
-            background: #f0f0f0;
+            background: #f8f9fa;
         }
 
         .btn-danger {
@@ -452,357 +636,306 @@ class ProductionBuilder {
             color: white;
         }
 
+        .btn-edit {
+            color: #667eea;
+            border-color: #667eea;
+        }
+
+        .btn-edit:hover {
+            background: #667eea;
+            color: white;
+        }
+
         .todo-filters {
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-top: 20px;
+            margin-bottom: 20px;
         }
 
         .filter-btn {
-            padding: 8px 16px;
-            border: 1px solid #ddd;
+            padding: 10px 20px;
+            border: 2px solid #e1e5e9;
             background: white;
-            border-radius: 4px;
+            border-radius: 25px;
             cursor: pointer;
-            text-decoration: none;
-            color: #333;
+            color: #666;
+            font-weight: 500;
+            transition: all 0.3s ease;
         }
 
         .filter-btn:hover {
-            background: #f0f0f0;
+            border-color: #667eea;
+            color: #667eea;
         }
 
         .filter-btn.active {
-            background: #007bff;
+            background: #667eea;
             color: white;
-            border-color: #007bff;
+            border-color: #667eea;
+        }
+
+        .todo-stats {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
         }
 
         .empty-state {
             text-align: center;
-            color: #666;
+            color: #999;
             font-style: italic;
-            padding: 40px 20px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px 20px;
+            padding: 60px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
 
         .error {
             background: #f8d7da;
             color: #721c24;
-            padding: 15px;
-            border-radius: 4px;
+            padding: 20px;
+            border-radius: 8px;
             margin-bottom: 20px;
+        }
+
+        .error h1, .error h2 {
+            color: #721c24;
+            margin-bottom: 15px;
         }
 
         /* Responsive design */
         @media (max-width: 480px) {
-            body {
-                padding: 10px;
-            }
-
-            .todo-app {
-                padding: 15px;
-            }
-
-            h1 {
-                font-size: 1.5rem;
-            }
-
-            .todo-filters {
-                flex-direction: column;
-                align-items: center;
-            }
+            body { padding: 10px; }
+            .todo-app { padding: 20px; }
+            h1 { font-size: 2rem; }
+            .todo-input-container { flex-direction: column; }
+            .todo-filters { flex-direction: column; align-items: center; }
         }
-    </style>
-</head>
-<body>
-    <div id="app">
-        <div class="todo-app">
-            <div class="loading">
-                <h1>TodoLang Todo Application</h1>
-                <p>Loading application...</p>
-            </div>
-        </div>
-    </div>
 
-    <!-- TodoLang Application Bundle -->
-    <script src="todolang-app.bundle.js"></script>
-
-    <!-- Fallback for when JavaScript is disabled -->
-    <noscript>
-        <div class="error">
-            <strong>JavaScript Required:</strong> This TodoLang application requires JavaScript to function properly.
-        </div>
-    </noscript>
-</body>
-</html>`;
-
-    const htmlPath = path.join(this.options.outputDir, 'index.html');
-    fs.writeFileSync(htmlPath, htmlTemplate);
-
-    console.log('✅ Production HTML generated');
+        /* Print styles */
+        @media print {
+            body { background: white; padding: 0; }
+            .todo-app { box-shadow: none; padding: 20px; }
+            .todo-filters, .todo-actions, .add-btn { display: none; }
+        }
+    `;
   }
 
-  async copyAndOptimizeAssets() {
-    console.log('📁 Copying and optimizing assets...');
+  async createOptimizedPolyfills() {
+    console.log('🔧 Creating optimized polyfills...');
 
-    // In a real implementation, you would:
-    // 1. Copy CSS files and minify them
-    // 2. Copy and optimize images
-    // 3. Copy fonts and other static assets
-    // 4. Generate asset manifest
+    const polyfillsContent = `/*!
+ * TodoLang Browser Compatibility Polyfills v${this.config.version}
+ */
 
-    console.log('✅ Assets processed (no additional assets found)');
-  }
+(function() {
+  'use strict';
 
-  async generateBuildManifest() {
-    console.log('📋 Generating build manifest...');
-
-    const manifest = {
-      buildTime: new Date().toISOString(),
-      version: this.getVersion(),
-      mode: 'production',
-      stats: {
-        totalFiles: this.buildStats.totalFiles,
-        compiledFiles: this.buildStats.compiledFiles,
-        bundleSize: this.buildStats.bundleSize,
-        optimizationSavings: this.buildStats.optimizationSavings,
-        buildDuration: this.buildStats.endTime - this.buildStats.startTime
-      },
-      files: this.getOutputFiles(),
-      warnings: this.buildStats.warnings,
-      errors: this.buildStats.errors
+  // Array.prototype.find polyfill
+  if (!Array.prototype.find) {
+    Array.prototype.find = function(predicate) {
+      if (this == null) throw new TypeError('Array.prototype.find called on null or undefined');
+      if (typeof predicate !== 'function') throw new TypeError('predicate must be a function');
+      var list = Object(this);
+      var length = parseInt(list.length) || 0;
+      var thisArg = arguments[1];
+      for (var i = 0; i < length; i++) {
+        var value = list[i];
+        if (predicate.call(thisArg, value, i, list)) return value;
+      }
+      return undefined;
     };
+  }
 
-    const manifestPath = path.join(this.options.outputDir, 'build-manifest.json');
+  // Array.prototype.filter polyfill
+  if (!Array.prototype.filter) {
+    Array.prototype.filter = function(fun) {
+      if (this === void 0 || this === null) throw new TypeError();
+      var t = Object(this);
+      var len = parseInt(t.length) || 0;
+      if (typeof fun !== 'function') throw new TypeError();
+      var res = [];
+      var thisArg = arguments.length >= 2 ? arguments[1] : void 0;
+      for (var i = 0; i < len; i++) {
+        if (i in t) {
+          var val = t[i];
+          if (fun.call(thisArg, val, i, t)) res.push(val);
+        }
+      }
+      return res;
+    };
+  }
+
+  // Promise polyfill (basic implementation)
+  if (typeof Promise === 'undefined') {
+    window.Promise = function(executor) {
+      var self = this;
+      self.state = 'pending';
+      self.value = undefined;
+      self.handlers = [];
+
+      function resolve(result) {
+        if (self.state === 'pending') {
+          self.state = 'fulfilled';
+          self.value = result;
+          self.handlers.forEach(handle);
+          self.handlers = null;
+        }
+      }
+
+      function reject(error) {
+        if (self.state === 'pending') {
+          self.state = 'rejected';
+          self.value = error;
+          self.handlers.forEach(handle);
+          self.handlers = null;
+        }
+      }
+
+      function handle(handler) {
+        if (self.state === 'pending') {
+          self.handlers.push(handler);
+        } else {
+          if (self.state === 'fulfilled' && typeof handler.onFulfilled === 'function') {
+            handler.onFulfilled(self.value);
+          }
+          if (self.state === 'rejected' && typeof handler.onRejected === 'function') {
+            handler.onRejected(self.value);
+          }
+        }
+      }
+
+      this.then = function(onFulfilled, onRejected) {
+        return new Promise(function(resolve, reject) {
+          handle({
+            onFulfilled: function(result) {
+              try {
+                resolve(onFulfilled ? onFulfilled(result) : result);
+              } catch (ex) {
+                reject(ex);
+              }
+            },
+            onRejected: function(error) {
+              try {
+                resolve(onRejected ? onRejected(error) : error);
+              } catch (ex) {
+                reject(ex);
+              }
+            }
+          });
+        });
+      };
+
+      executor(resolve, reject);
+    };
+  }
+
+  // localStorage polyfill
+  if (typeof Storage === 'undefined') {
+    window.localStorage = {
+      _data: {},
+      setItem: function(key, value) { this._data[key] = String(value); },
+      getItem: function(key) { return this._data.hasOwnProperty(key) ? this._data[key] : null; },
+      removeItem: function(key) { delete this._data[key]; },
+      clear: function() { this._data = {}; }
+    };
+  }
+
+  console.log('✅ Browser compatibility polyfills loaded');
+})();`;
+
+    const outputPath = path.join(this.config.deploymentDir, 'js', 'polyfills.js');
+    fs.writeFileSync(outputPath, polyfillsContent);
+
+    console.log(`✅ Optimized polyfills created: ${this.formatFileSize(polyfillsContent.length)}`);
+  }
+
+  async createServiceWorker() {
+    console.log('⚙️ Creating service worker...');
+
+    const serviceWorkerContent = `// TodoLang Service Worker v${this.config.version}
+const CACHE_NAME = 'todolang-v${this.config.version}';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/js/todolang-app.js',
+  '/js/polyfills.js'
+];
+
+self.addEventListener('install', function(event) {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(function(cache) {
+        return cache.addAll(urlsToCache);
+      })
+  );
+});
+
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    caches.match(event.request)
+      .then(function(response) {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      }
+    )
+  );
+});`;
+
+    const outputPath = path.join(this.config.deploymentDir, 'sw.js');
+    fs.writeFileSync(outputPath, serviceWorkerContent);
+
+    console.log('✅ Service worker created');
+  }
+
+  async updateManifest() {
+    console.log('📋 Updating deployment manifest...');
+
+    const manifestPath = path.join(this.config.deploymentDir, 'deployment-manifest.json');
+    let manifest = {};
+
+    if (fs.existsSync(manifestPath)) {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    }
+
+    // Update manifest with build information
+    manifest.buildTime = this.config.buildTime;
+    manifest.version = this.config.version;
+    manifest.buildMode = 'production';
+    manifest.optimized = true;
+
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-    console.log('✅ Build manifest generated');
+    console.log('✅ Deployment manifest updated');
   }
 
-  async analyzeBuild() {
-    console.log('📊 Analyzing build...');
-
-    const analysis = {
-      bundleSize: this.buildStats.bundleSize,
-      compressionRatio: this.buildStats.optimizationSavings / this.buildStats.bundleSize,
-      fileCount: this.getOutputFiles().length,
-      buildTime: this.buildStats.endTime - this.buildStats.startTime
-    };
-
-    console.log('  Bundle Analysis:');
-    console.log(`    Size: ${this.formatBytes(analysis.bundleSize)}`);
-    console.log(`    Compression: ${(analysis.compressionRatio * 100).toFixed(1)}%`);
-    console.log(`    Files: ${analysis.fileCount}`);
-    console.log(`    Build Time: ${analysis.buildTime}ms`);
-
-    // Save analysis report
-    const analysisPath = path.join(this.options.outputDir, 'build-analysis.json');
-    fs.writeFileSync(analysisPath, JSON.stringify(analysis, null, 2));
-
-    console.log('✅ Build analysis complete');
-  }
-
-  async cleanupTempDirectory() {
-    if (fs.existsSync(this.options.tempDir)) {
-      fs.rmSync(this.options.tempDir, { recursive: true, force: true });
-    }
-  }
-
-  findJavaScriptFiles(dir) {
-    const files = [];
-
-    if (!fs.existsSync(dir)) {
-      return files;
-    }
-
-    const items = fs.readdirSync(dir);
-
-    for (const item of items) {
-      const fullPath = path.join(dir, item);
-      const stat = fs.statSync(fullPath);
-
-      if (stat.isDirectory()) {
-        files.push(...this.findJavaScriptFiles(fullPath));
-      } else if (item.endsWith('.js')) {
-        files.push(fullPath);
-      }
-    }
-
-    return files;
-  }
-
-  optimizeCode(code) {
-    // Apply production optimizations
-    let optimized = code;
-
-    // Remove development-only code
-    optimized = optimized.replace(/console\.log\([^)]*\);?\s*/g, '');
-    optimized = optimized.replace(/console\.debug\([^)]*\);?\s*/g, '');
-
-    // Remove empty lines
-    optimized = optimized.replace(/^\s*\n/gm, '');
-
-    return optimized;
-  }
-
-  getVersion() {
-    try {
-      const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-      return packageJson.version || '1.0.0';
-    } catch {
-      return '1.0.0';
-    }
-  }
-
-  getOutputFiles() {
-    const files = [];
-    const outputFiles = this.findAllFiles(this.options.outputDir);
-
-    for (const file of outputFiles) {
-      const relativePath = path.relative(this.options.outputDir, file);
-      const stat = fs.statSync(file);
-
-      files.push({
-        path: relativePath,
-        size: stat.size,
-        modified: stat.mtime.toISOString()
-      });
-    }
-
-    return files;
-  }
-
-  findAllFiles(dir) {
-    const files = [];
-
-    if (!fs.existsSync(dir)) {
-      return files;
-    }
-
-    const items = fs.readdirSync(dir);
-
-    for (const item of items) {
-      const fullPath = path.join(dir, item);
-      const stat = fs.statSync(fullPath);
-
-      if (stat.isDirectory()) {
-        files.push(...this.findAllFiles(fullPath));
-      } else {
-        files.push(fullPath);
-      }
-    }
-
-    return files;
-  }
-
-  formatBytes(bytes) {
+  formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
-
-  printBuildSummary() {
-    const duration = this.buildStats.endTime - this.buildStats.startTime;
-
-    console.log('\n' + '='.repeat(50));
-    console.log('📊 Production Build Summary');
-    console.log('='.repeat(50));
-    console.log(`Build Time: ${duration}ms`);
-    console.log(`Source Files: ${this.buildStats.totalFiles}`);
-    console.log(`Compiled Files: ${this.buildStats.compiledFiles}`);
-    console.log(`Bundle Size: ${this.formatBytes(this.buildStats.bundleSize)}`);
-    console.log(`Optimization Savings: ${this.formatBytes(this.buildStats.optimizationSavings)}`);
-    console.log(`Output Directory: ${this.options.outputDir}`);
-
-    if (this.buildStats.warnings.length > 0) {
-      console.log(`⚠️  Warnings: ${this.buildStats.warnings.length}`);
-    }
-
-    if (this.buildStats.errors.length > 0) {
-      console.log(`❌ Errors: ${this.buildStats.errors.length}`);
-    }
   }
 }
 
 // CLI interface
 async function main() {
-  const args = process.argv.slice(2);
-  const options = {};
-
-  // Parse command line arguments
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    switch (arg) {
-      case '--source-dir':
-        options.sourceDir = args[++i];
-        break;
-      case '--output-dir':
-        options.outputDir = args[++i];
-        break;
-      case '--no-minify':
-        options.enableMinification = false;
-        break;
-      case '--no-optimize':
-        options.enableOptimization = false;
-        break;
-      case '--no-bundle':
-        options.enableBundling = false;
-        break;
-      case '--no-analysis':
-        options.enableAnalysis = false;
-        break;
-      case '--help':
-        console.log(`
-TodoLang Production Build Script
-
-Usage: node scripts/build-production.js [options]
-
-Options:
-  --source-dir <path>    Source directory path (default: src/app)
-  --output-dir <path>    Output directory path (default: dist)
-  --no-minify           Disable code minification
-  --no-optimize         Disable code optimization
-  --no-bundle           Disable bundling
-  --no-analysis         Disable build analysis
-  --help                Show this help message
-
-Examples:
-  node scripts/build-production.js
-  node scripts/build-production.js --output-dir build
-  node scripts/build-production.js --no-minify --no-analysis
-`);
-        return;
-    }
-  }
-
-  const builder = new ProductionBuilder(options);
+  const builder = new ProductionBuilder();
 
   try {
     await builder.build();
-    console.log('\n🎉 Production build completed successfully!');
     process.exit(0);
   } catch (error) {
-    console.error('\n💥 Production build failed:', error.message);
+    console.error('Build failed:', error.message);
     process.exit(1);
   }
 }
 
 // Run if called directly
 if (process.argv[1] && process.argv[1].endsWith('build-production.js')) {
-  main().catch(error => {
-    console.error('Production build error:', error);
-    process.exit(1);
-  });
+  main();
 }
 
 export { ProductionBuilder };

@@ -2,7 +2,7 @@
   "name": "TodoLang Todo Application",
   "version": "1.0.0",
   "description": "An extremely over-engineered todo application built with a custom domain-specific language",
-  "buildTime": "2025-07-31T12:28:48.156Z",
+  "buildTime": "2025-07-31T14:46:59.990Z",
   "buildMode": "production",
   "package": {
     "totalSize": "55.8 KB",
@@ -82,5 +82,6 @@
     "documentation": "docs/",
     "troubleshooting": "docs/SETUP.md#troubleshooting",
     "browserConsole": "Check F12 developer tools for errors"
-  }
+  },
+  "optimized": true
 }

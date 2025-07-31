@@ -19,18 +19,17 @@
     <style>
         
         /* Critical CSS for TodoLang Application */
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             line-height: 1.6;
+            color: #333;
         }
 
         .todo-app {
@@ -38,7 +37,6 @@
             border-radius: 12px;
             padding: 30px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            backdrop-filter: blur(10px);
         }
 
         h1 {
@@ -123,10 +121,6 @@
             background-color: #f8f9fa;
         }
 
-        .todo-item:last-child {
-            border-bottom: none;
-        }
-
         .todo-item.completed {
             opacity: 0.6;
         }
@@ -199,7 +193,6 @@
             background: white;
             border-radius: 25px;
             cursor: pointer;
-            text-decoration: none;
             color: #666;
             font-weight: 500;
             transition: all 0.3s ease;
@@ -239,74 +232,25 @@
             margin-bottom: 20px;
         }
 
-        .error h1 {
+        .error h1, .error h2 {
             color: #721c24;
             margin-bottom: 15px;
         }
 
-        .error details {
-            margin-top: 15px;
-        }
-
-        .error pre {
-            background: #fff;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 12px;
-        }
-
         /* Responsive design */
         @media (max-width: 480px) {
-            body {
-                padding: 10px;
-            }
-
-            .todo-app {
-                padding: 20px;
-            }
-
-            h1 {
-                font-size: 2rem;
-            }
-
-            .todo-input-container {
-                flex-direction: column;
-            }
-
-            .todo-filters {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .todo-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .todo-actions {
-                align-self: flex-end;
-            }
+            body { padding: 10px; }
+            .todo-app { padding: 20px; }
+            h1 { font-size: 2rem; }
+            .todo-input-container { flex-direction: column; }
+            .todo-filters { flex-direction: column; align-items: center; }
         }
 
         /* Print styles */
         @media print {
-            body {
-                background: white;
-                padding: 0;
-            }
-
-            .todo-app {
-                box-shadow: none;
-                padding: 20px;
-            }
-
-            .todo-filters,
-            .todo-actions,
-            .add-btn {
-                display: none;
-            }
+            body { background: white; padding: 0; }
+            .todo-app { box-shadow: none; padding: 20px; }
+            .todo-filters, .todo-actions, .add-btn { display: none; }
         }
     
     </style>
@@ -322,15 +266,20 @@
         </div>
     </div>
 
+    <!-- Browser compatibility polyfills (loaded conditionally) -->
+    <script>
+        // Load polyfills only if needed
+        if (!Array.prototype.find || typeof Promise === 'undefined') {
+            document.write('<script src="js/polyfills.js"><\/script>');
+        }
+    </script>
+
     <!-- Main application script -->
     <script src="js/todolang-app.js"></script>
 
-    <!-- Browser compatibility polyfills -->
-    <script src="js/polyfills.js"></script>
-
     <!-- Service worker registration -->
     <script>
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('sw.js')
                     .then(function(registration) {
