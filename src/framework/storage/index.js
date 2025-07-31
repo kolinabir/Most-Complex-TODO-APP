@@ -4,21 +4,74 @@
  * serialization, graceful degradation, and quota management
  */
 
+import { globalErrorReporter } from '../../debug/error-reporter.js';
+
 class StorageError extends Error {
-  constructor(message, code, originalError = null) {
+  constructor(message, code, originalError = null, userMessage = null) {
     super(message);
     this.name = 'StorageError';
     this.code = code;
     this.originalError = originalError;
+    this.userMessage = userMessage || this._generateUserMessage(code);
+    this.timestamp = new Date().toISOString();
+  }
+
+  /**
+   * Generate user-friendly error messages
+   */
+  _generateUserMessage(code) {
+    const userMessages = {
+      'QUOTA_EXCEEDED': 'Storage space is full. Please clear some data or try again later.',
+      'STORAGE_UNAVAILABLE': 'Data storage is not available. Your changes may not be saved.',
+      'SERIALIZATION_ERROR': 'Unable to save data due to formatting issues.',
+      'DESERIALIZATION_ERROR': 'Unable to load saved data. The data may be corrupted.',
+      'INVALID_KEY': 'Invalid data identifier provided.',
+      'STORAGE_FAILED': 'Failed to save data. Please try again.',
+      'REMOVAL_FAILED': 'Failed to delete data. Please try again.',
+      'CLEAR_FAILED': 'Failed to clear storage. Please try again.',
+      'NETWORK_ERROR': 'Network connection issue. Please check your connection.',
+      'PERMISSION_DENIED': 'Permission denied. Please check your browser settings.',
+      'TIMEOUT': 'Operation timed out. Please try again.'
+    };
+
+    return userMessages[code] || 'An unexpected storage error occurred. Please try again.';
+  }
+
+  /**
+   * Get user-friendly error message
+   */
+  getUserMessage() {
+    return this.userMessage;
+  }
+
+  /**
+   * Get error details for debugging
+   */
+  getDebugInfo() {
+    return {
+      message: this.message,
+      code: this.code,
+      userMessage: this.userMessage,
+      timestamp: this.timestamp,
+      originalError: this.originalError ? {
+        name: this.originalError.name,
+        message: this.originalError.message,
+        stack: this.originalError.stack
+      } : null
+    };
   }
 }
 
 class StorageService {
-  constructor() {
+  constructor(options = {}) {
     this.isAvailable = this._checkAvailability();
     this.fallbackStorage = new Map();
-    this.quotaWarningThreshold = 0.8; // 80% of quota
-    this.maxRetries = 3;
+    this.quotaWarningThreshold = options.quotaWarningThreshold || 0.8; // 80% of quota
+    this.maxRetries = options.maxRetries || 3;
+    this.enableErrorReporting = options.enableErrorReporting !== false;
+    this.userErrorCallback = options.onUserError || null;
+    this.errorHistory = [];
+    this.maxErrorHistory = 50;
   }
 
   /**
@@ -390,6 +443,178 @@ class StorageService {
       }
     }
     return results;
+  }
+
+  /**
+   * Handle storage error with user-friendly messaging
+   */
+  _handleStorageError(error, operation = 'storage operation') {
+    // Add to error history
+    this.errorHistory.push({
+      error: error,
+      operation: operation,
+      timestamp: new Date().toISOString(),
+      isAvailable: this.isAvailable
+    });
+
+    // Keep error history within limits
+    if (this.errorHistory.length > this.maxErrorHistory) {
+      this.errorHistory = this.errorHistory.slice(-this.maxErrorHistory);
+    }
+
+    // Report error if enabled
+    if (this.enableErrorReporting) {
+      globalErrorReporter.reportRuntimeError(error, {
+        component: 'StorageService',
+        operation: operation,
+        isAvailable: this.isAvailable,
+        fallbackStorageSize: this.fallbackStorage.size
+      });
+    }
+
+    // Call user error callback if provided
+    if (this.userErrorCallback) {
+      try {
+        this.userErrorCallback(error, operation);
+      } catch (callbackError) {
+        console.error('Error in user error callback:', callbackError);
+      }
+    }
+
+    return error;
+  }
+
+  /**
+   * Get user-friendly error message for display
+   */
+  getUserErrorMessage(error) {
+    if (error instanceof StorageError) {
+      return error.getUserMessage();
+    }
+
+    // Fallback for non-StorageError instances
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      return 'Storage space is full. Please clear some data or try again later.';
+    }
+
+    if (error.name === 'SecurityError') {
+      return 'Permission denied. Please check your browser settings.';
+    }
+
+    return 'An unexpected storage error occurred. Please try again.';
+  }
+
+  /**
+   * Get error history for debugging
+   */
+  getErrorHistory() {
+    return this.errorHistory.slice(); // Return copy
+  }
+
+  /**
+   * Clear error history
+   */
+  clearErrorHistory() {
+    this.errorHistory = [];
+  }
+
+  /**
+   * Get error statistics
+   */
+  getErrorStats() {
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000);
+    const oneDayAgo = now - (24 * 60 * 60 * 1000);
+
+    const recentErrors = this.errorHistory.filter(entry =>
+      new Date(entry.timestamp).getTime() > oneHourAgo
+    );
+
+    const dailyErrors = this.errorHistory.filter(entry =>
+      new Date(entry.timestamp).getTime() > oneDayAgo
+    );
+
+    const errorTypes = {};
+    for (const entry of this.errorHistory) {
+      const type = entry.error.code || entry.error.name || 'unknown';
+      errorTypes[type] = (errorTypes[type] || 0) + 1;
+    }
+
+    return {
+      total: this.errorHistory.length,
+      recent: recentErrors.length,
+      daily: dailyErrors.length,
+      types: errorTypes,
+      isAvailable: this.isAvailable,
+      fallbackStorageSize: this.fallbackStorage.size
+    };
+  }
+
+  /**
+   * Test storage functionality
+   */
+  async testStorage() {
+    const testResults = {
+      isAvailable: this.isAvailable,
+      canWrite: false,
+      canRead: false,
+      canDelete: false,
+      quotaInfo: null,
+      errors: []
+    };
+
+    const testKey = '__storage_test_' + Date.now();
+    const testValue = { test: true, timestamp: Date.now() };
+
+    try {
+      // Test write
+      await this.setItem(testKey, testValue);
+      testResults.canWrite = true;
+
+      // Test read
+      const retrieved = this.getItem(testKey);
+      testResults.canRead = retrieved && retrieved.test === true;
+
+      // Test delete
+      this.removeItem(testKey);
+      testResults.canDelete = !this.hasItem(testKey);
+
+      // Get quota info
+      testResults.quotaInfo = await this.getQuotaInfo();
+
+    } catch (error) {
+      testResults.errors.push({
+        message: error.message,
+        code: error.code,
+        userMessage: this.getUserErrorMessage(error)
+      });
+    }
+
+    return testResults;
+  }
+
+  /**
+   * Recover from storage errors
+   */
+  async recoverFromError(errorType) {
+    switch (errorType) {
+      case 'QUOTA_EXCEEDED':
+        await this._performCleanup();
+        return 'Storage cleanup completed. Please try again.';
+
+      case 'STORAGE_UNAVAILABLE':
+        this.isAvailable = this._checkAvailability();
+        return this.isAvailable ?
+          'Storage is now available.' :
+          'Storage is still unavailable. Using temporary storage.';
+
+      case 'DESERIALIZATION_ERROR':
+        // Could implement data recovery strategies here
+        return 'Data corruption detected. Some data may be lost.';
+
+      default:
+        return 'Recovery attempt completed. Please try again.';
+    }
   }
 }
 
